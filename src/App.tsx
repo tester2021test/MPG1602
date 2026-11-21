@@ -100,7 +100,7 @@ const NativeDonutChart: React.FC<{
   data: { name: string; value: number; color: string }[];
   size?: number;
   strokeWidth?: number;
-}> = ({ data, size = 136, strokeWidth = 18 }) => {
+}> = ({ data, size = 148, strokeWidth = 20 }) => {
   const total = data.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -116,17 +116,17 @@ const NativeDonutChart: React.FC<{
           fill="none"
           stroke="currentColor"
           strokeWidth={strokeWidth}
-          className="text-slate-200 dark:text-slate-700"
+          className="text-slate-200 dark:text-slate-800"
         />
       </svg>
     );
   }
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto -rotate-90">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto -rotate-90 drop-shadow-sm">
       {data.map((slice, idx) => {
         const pct = slice.value / total;
-        const dashLength = Math.max(0, pct * circumference - 2);
+        const dashLength = Math.max(0, pct * circumference - 3);
         const dashOffset = -cumulativePct * circumference;
         cumulativePct += pct;
         return (
@@ -151,30 +151,38 @@ const NativeDonutChart: React.FC<{
 const NativeBarChart: React.FC<{
   data: { name: string; Actual: number; color: string }[];
 }> = ({ data }) => {
+  if (!data.length) {
+    return (
+      <div className="h-44 flex flex-col items-center justify-center text-center px-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-800">
+        <span className="text-xs font-extrabold text-slate-400">No spend data yet</span>
+        <span className="text-[11px] text-slate-400 mt-0.5">Tap + below to log your first expense</span>
+      </div>
+    );
+  }
   const maxVal = Math.max(1, ...data.map((d) => d.Actual));
   return (
-    <div className="h-52 flex flex-col justify-end pt-4 pb-1">
-      <div className="flex-1 flex items-end justify-around gap-2 px-1 border-b border-slate-200 dark:border-slate-700">
+    <div className="h-52 flex flex-col justify-end pt-5 pb-1">
+      <div className="flex-1 flex items-end justify-around gap-2.5 px-1 border-b border-slate-200 dark:border-slate-700/80">
         {data.map((item) => {
-          const heightPct = Math.max(8, Math.round((item.Actual / maxVal) * 100));
+          const heightPct = Math.max(10, Math.round((item.Actual / maxVal) * 100));
           return (
             <div key={item.name} className="flex-1 flex flex-col items-center h-full justify-end">
-              <span className="text-[10px] font-extrabold text-slate-600 dark:text-slate-300 mb-1">
+              <span className="text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1.5">
                 ₹{item.Actual}k
               </span>
               <div
-                className="w-full max-w-[34px] rounded-t-xl transition-all duration-500"
+                className="w-full max-w-[38px] rounded-t-2xl shadow-sm transition-all duration-500"
                 style={{ height: `${heightPct}%`, backgroundColor: item.color }}
               />
             </div>
           );
         })}
       </div>
-      <div className="flex items-center justify-around gap-2 px-1 pt-2">
+      <div className="flex items-center justify-around gap-2 px-1 pt-2.5">
         {data.map((item) => (
           <span
             key={item.name}
-            className="flex-1 text-center text-[10px] font-extrabold text-slate-500 dark:text-slate-400 truncate"
+            className="flex-1 text-center text-[11px] font-extrabold text-slate-500 dark:text-slate-400 truncate"
           >
             {item.name}
           </span>
@@ -187,11 +195,18 @@ const NativeBarChart: React.FC<{
 const NativeAreaChart: React.FC<{
   data: { date: string; cumulative: number }[];
 }> = ({ data }) => {
-  if (!data.length) return null;
+  if (!data.length) {
+    return (
+      <div className="h-44 flex flex-col items-center justify-center text-center px-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-800">
+        <span className="text-xs font-extrabold text-slate-400">Spend timeline builds automatically</span>
+        <span className="text-[11px] text-slate-400 mt-0.5">Add bills to see your cumulative curve</span>
+      </div>
+    );
+  }
   const width = 320;
-  const height = 165;
+  const height = 168;
   const padX = 24;
-  const padY = 22;
+  const padY = 24;
   const maxVal = Math.max(1, ...data.map((d) => d.cumulative));
   const stepX = data.length > 1 ? (width - padX * 2) / (data.length - 1) : 0;
 
@@ -208,19 +223,19 @@ const NativeAreaChart: React.FC<{
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48 overflow-visible">
       <defs>
         <linearGradient id="homeledgerAreaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.32" />
+          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
         </linearGradient>
       </defs>
       <path d={areaPath} fill="url(#homeledgerAreaGrad)" />
-      <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
       {points.map((p) => (
         <g key={p.date}>
-          <circle cx={p.x} cy={p.y} r="4" fill="#6366f1" />
-          <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="9" fontWeight="700" fill="#6366f1">
+          <circle cx={p.x} cy={p.y} r="4.5" fill="#6366f1" stroke="#ffffff" strokeWidth="1.5" />
+          <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize="9.5" fontWeight="800" fill="#6366f1">
             ₹{p.cumulative}k
           </text>
-          <text x={p.x} y={height - 4} textAnchor="middle" fontSize="9" fontWeight="600" fill="#94a3b8">
+          <text x={p.x} y={height - 4} textAnchor="middle" fontSize="9" fontWeight="700" fill="#94a3b8">
             {p.date}
           </text>
         </g>
@@ -553,6 +568,8 @@ export default function App() {
   // --- Transactions Search & Filter State ---
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [majuriFormMode, setMajuriFormMode] = useState<'measure' | 'advance'>('measure');
+  const [showMoreExpenseFields, setShowMoreExpenseFields] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1035,6 +1052,7 @@ export default function App() {
     setFormDate(prefill.date || new Date().toISOString().split('T')[0]);
     setFormNotes(prefill.notes || '');
     setFormReceipt(prefill.receipt || null);
+    setShowMoreExpenseFields(Boolean(prefill.id || prefill.vendor || prefill.receipt || prefill.notes));
     setIsAddDrawerOpen(true);
   };
 
@@ -1856,33 +1874,36 @@ export default function App() {
 
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200 selection:bg-indigo-500 selection:text-white overflow-x-hidden">
         <div className="w-full max-w-md min-h-screen bg-slate-50 dark:bg-slate-900 shadow-2xl sm:border-x border-slate-200/80 dark:border-slate-800 flex flex-col relative pb-28">
           {/* Toast Notification Pill */}
           {toastMessage && (
-            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-full shadow-xl text-sm font-semibold flex items-center gap-2 animate-bounce">
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-2xl shadow-2xl text-xs font-extrabold flex items-center justify-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
-              <span>{toastMessage}</span>
+              <span className="truncate">{toastMessage}</span>
             </div>
           )}
 
-          {/* ================= TOP APP HEADER & PROJECT SWITCHER ================= */}
-          <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-b border-slate-200/70 dark:border-slate-800 px-4 pt-3.5 pb-3">
+          {/* ================= CLEAN MOBILE-FIRST HEADER ================= */}
+          <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800 px-4 pt-3.5 pb-3">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 shrink-0">
                   <Home className="w-5 h-5" />
                 </div>
-                <div>
-                  <h1 className="text-base font-extrabold tracking-tight leading-none">HomeLedger</h1>
-                  <div className="flex items-center gap-1.5 mt-1">
+                <div className="min-w-0">
+                  <h1 className="text-lg font-black tracking-tight leading-none">HomeLedger</h1>
+                  <button
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="flex items-center gap-1.5 mt-1 text-left"
+                  >
                     {!isOnline || syncStatus === 'offline' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                        <CloudOff className="w-3 h-3" /> Offline Cached
+                        <CloudOff className="w-3 h-3" /> Offline • {sharedRoomCode}
                       </span>
                     ) : syncStatus === 'synced' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <Cloud className="w-3 h-3" /> Online • {sharedRoomCode}
+                        <Cloud className="w-3 h-3" /> Synced • {sharedRoomCode}
                       </span>
                     ) : syncStatus === 'syncing' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
@@ -1890,49 +1911,28 @@ export default function App() {
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Ready • {sharedRoomCode}
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> {sharedRoomCode}
                       </span>
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
 
-              {/* Right Controls: Majuri, PDF Export, Workspace, Theme & Sign-In */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setActiveTab('majuri')}
-                  title="Carpentry Majuri Calculator & Room Logs"
-                  className={`h-10 px-2.5 rounded-2xl border flex items-center gap-1 text-xs font-extrabold transition-colors ${
-                    activeTab === 'majuri'
-                      ? 'bg-orange-600 text-white border-orange-600'
-                      : 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30 hover:bg-orange-500/25'
-                  }`}
-                >
-                  <Ruler className="w-3.5 h-3.5" />
-                  <span>Majuri</span>
-                </button>
-
+              {/* Minimal Right Actions: PDF Report, Theme & Account */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setIsExportModalOpen(true)}
-                  title="Export Graphical PDF & CSV Report"
-                  className="h-10 px-2.5 rounded-2xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 flex items-center gap-1 text-xs font-extrabold transition-colors"
+                  title="Graphical PDF & CSV Export"
+                  className="h-11 px-3.5 rounded-2xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 flex items-center gap-1.5 text-xs font-extrabold active:scale-95 transition-all"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>PDF</span>
-                </button>
-
-                <button
-                  onClick={() => setIsShareModalOpen(true)}
-                  title="Workspace Code"
-                  className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 transition-colors"
-                >
-                  <Users className="w-4 h-4" />
+                  <Download className="w-4 h-4" />
+                  <span>Report</span>
                 </button>
 
                 <button
                   onClick={() => setDarkMode(!darkMode)}
                   aria-label="Toggle color theme"
-                  className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-colors"
+                  className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-95 transition-all"
                 >
                   {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
                 </button>
@@ -1940,24 +1940,24 @@ export default function App() {
                 {user ? (
                   <button
                     onClick={handleSignOut}
-                    title={`Signed in as ${user.email || ALLOWED_EMAIL} — Click to Sign Out`}
-                    className="h-10 px-2.5 rounded-2xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1 text-xs font-bold"
+                    title={`Signed in as ${user.email || ALLOWED_EMAIL}`}
+                    className="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center active:scale-95 transition-all"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
+                    <LogOut className="w-4 h-4" />
                   </button>
                 ) : (
                   <button
                     onClick={handleGoogleSignIn}
                     title={`Sign in with ${ALLOWED_EMAIL}`}
-                    className="h-10 px-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                    className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all"
                   >
-                    <LogIn className="w-3.5 h-3.5" />
+                    <LogIn className="w-4 h-4" />
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Top Project Switcher Pill */}
+            {/* Large Thumb-Friendly Space Switcher */}
             <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-2xl">
               {Object.values(projects).map((proj) => {
                 const active = activeProjectKey === proj.id;
@@ -1968,13 +1968,13 @@ export default function App() {
                       setActiveProjectKey(proj.id);
                       setSelectedCategoryFilter('all');
                     }}
-                    className={`min-h-[42px] px-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`min-h-[44px] px-3 rounded-xl text-xs font-extrabold transition-all ${
                       active
                         ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
-                    {proj.shortName}
+                    {proj.name}
                   </button>
                 );
               })}
@@ -1989,77 +1989,79 @@ export default function App() {
                 {analytics.urgentMilestones.length > 0 && (
                   <button
                     onClick={() => setActiveTab('vendors')}
-                    className="w-full text-left p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+                    className="w-full text-left p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                        <AlertTriangle className="w-4 h-4" />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
                         <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
-                          {analytics.urgentMilestones.length} Milestone Payment{analytics.urgentMilestones.length > 1 ? 's' : ''} Due
+                          {analytics.urgentMilestones.length} Milestone Due
                         </span>
                         <p className="text-xs font-bold truncate">
-                          {analytics.urgentMilestones[0].vendorName}: {analytics.urgentMilestones[0].label} ({formatINR(analytics.urgentMilestones[0].amount, true)})
+                          {analytics.urgentMilestones[0].vendorName} • {formatINR(analytics.urgentMilestones[0].amount, true)}
                         </p>
                       </div>
                     </div>
-                    <ArrowUpRight className="w-4 h-4 text-rose-500 shrink-0" />
+                    <ArrowUpRight className="w-5 h-5 text-rose-500 shrink-0" />
                   </button>
                 )}
 
-                {/* Actual Spend Donut & KPI Summary Card */}
-                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3">
-                  <div className="flex items-center justify-between">
+                {/* Hero Graphical Spend Card */}
+                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-4">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                        {currentProject.name} • 100% Actuals
+                        Total Actual Spent
                       </span>
-                      <h2 className="text-2xl font-black tracking-tight mt-0.5">
+                      <h2 className="text-3xl font-black tracking-tight mt-0.5">
                         {formatINR(analytics.totalSpent)}
                       </h2>
                     </div>
                     <button
-                      onClick={() => setIsExportModalOpen(true)}
-                      className="h-9 px-3 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-extrabold flex items-center gap-1"
+                      onClick={() => setActiveTab('analytics')}
+                      className="h-10 px-3 rounded-2xl bg-slate-100 dark:bg-slate-900 text-xs font-extrabold text-slate-600 dark:text-slate-300 flex items-center gap-1"
                     >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Report</span>
+                      <BarChart3 className="w-4 h-4 text-indigo-600" />
+                      <span>Charts</span>
                     </button>
                   </div>
 
-                  {/* Donut Ring + Status Pills */}
-                  <div className="grid grid-cols-2 items-center gap-2">
-                    <div className="h-36 relative flex items-center justify-center">
-                      <NativeDonutChart data={analytics.categoryDonutData} size={136} strokeWidth={18} />
+                  {/* Donut Ring + 3 Clear Status Tiles */}
+                  <div className="grid grid-cols-12 items-center gap-3">
+                    <div className="col-span-6 relative flex items-center justify-center">
+                      <NativeDonutChart data={analytics.categoryDonutData} size={146} strokeWidth={20} />
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-[10px] font-bold text-slate-400">Bills</span>
-                        <span className="text-sm font-black">{analytics.billCount}</span>
+                        <span className="text-xl font-black leading-none">{analytics.billCount}</span>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mt-1">
+                          Bills
+                        </span>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-                        <span className="text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 block">
-                          Settled / Paid
+                    <div className="col-span-6 space-y-2">
+                      <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                          Paid
                         </span>
-                        <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                        <span className="text-xs font-black text-emerald-700 dark:text-emerald-300">
                           {formatINR(analytics.paidAmount, true)}
                         </span>
                       </div>
-                      <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-                        <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 block">
-                          Advance Given
+                      <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300">
+                          Advance
                         </span>
-                        <span className="text-sm font-black text-amber-700 dark:text-amber-300">
+                        <span className="text-xs font-black text-amber-700 dark:text-amber-300">
                           {formatINR(analytics.advanceAmount, true)}
                         </span>
                       </div>
-                      <div className="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20">
-                        <span className="text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400 block">
-                          Pending Dues
+                      <div className="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-rose-700 dark:text-rose-300">
+                          Dues
                         </span>
-                        <span className="text-sm font-black text-rose-700 dark:text-rose-300">
+                        <span className="text-xs font-black text-rose-700 dark:text-rose-300">
                           {formatINR(analytics.totalVendorDues, true)}
                         </span>
                       </div>
@@ -2067,20 +2069,45 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Material vs. Labour Split Ratio Bar */}
+                {/* Quick Carpentry Majuri Banner (On Interior Space) */}
+                {activeProjectKey === 'interior' && (
+                  <button
+                    onClick={() => setActiveTab('majuri')}
+                    className="w-full text-left bg-gradient-to-r from-orange-600 to-amber-500 text-white rounded-3xl p-4 shadow-md shadow-orange-600/20 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                        <Ruler className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-orange-100">
+                          Carpentry Majuri Khata • {majuriSummary.totalSqft} ft²
+                        </div>
+                        <div className="text-sm font-black truncate mt-0.5">
+                          Bill {formatINR(majuriSummary.totalWorkBill, true)} • Hafta {formatINR(majuriSummary.totalWeeklyAdvancePaid, true)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-3 py-1.5 rounded-xl bg-white/20 text-xs font-black shrink-0">
+                      Open →
+                    </div>
+                  </button>
+                )}
+
+                {/* Material vs. Labour Visual Pill Bar */}
                 {activeProjectKey !== 'general' && (
                   <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                        Material vs. Labour Split
+                        Material vs. Labour
                       </h3>
-                      <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-                        {analytics.materialPct}% Mat • {analytics.labourPct}% Lab
+                      <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                        {analytics.materialPct}% : {analytics.labourPct}%
                       </span>
                     </div>
-                    <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
+                    <div className="w-full h-3.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex gap-0.5">
                       <div
-                        className="h-full bg-indigo-600 transition-all duration-500"
+                        className="h-full bg-indigo-600 rounded-l-full transition-all duration-500"
                         style={{ width: `${analytics.materialPct}%` }}
                       />
                       <div
@@ -2088,31 +2115,33 @@ export default function App() {
                         style={{ width: `${analytics.labourPct}%` }}
                       />
                       <div
-                        className="h-full bg-emerald-500 transition-all duration-500"
+                        className="h-full bg-emerald-500 rounded-r-full transition-all duration-500"
                         style={{ width: `${analytics.generalPct}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-[11px] font-bold">
-                      <span className="text-indigo-600 dark:text-indigo-400">
-                        Material: {formatINR(analytics.materialSpent, true)}
+                    <div className="flex items-center justify-between text-xs font-extrabold">
+                      <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+                        Material {formatINR(analytics.materialSpent, true)}
                       </span>
-                      <span className="text-orange-600 dark:text-orange-400">
-                        Labour: {formatINR(analytics.labourSpent, true)}
+                      <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                        Labour {formatINR(analytics.labourSpent, true)}
                       </span>
                     </div>
                   </div>
                 )}
 
-                {/* Whole-Home Work & Expense Category Cards */}
+                {/* Graphical Category Cards Grid */}
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between px-1">
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                      Whole-Home Work Categories
+                      Categories
                     </h3>
-                    <span className="text-[11px] font-bold text-slate-400">Tap to view bills</span>
+                    <span className="text-[11px] font-bold text-slate-400">Tap to filter</span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-3">
                     {analytics.categoryList.map((cat) => (
                       <button
                         key={cat.id}
@@ -2120,23 +2149,25 @@ export default function App() {
                           setSelectedCategoryFilter(cat.id);
                           setActiveTab('expenses');
                         }}
-                        className="text-left bg-white dark:bg-slate-800/90 p-3.5 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm hover:border-indigo-400 transition-all space-y-2.5"
+                        className="text-left bg-white dark:bg-slate-800/90 p-4 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm hover:border-indigo-400 active:scale-[0.98] transition-all space-y-3"
                       >
                         <div className="flex items-center justify-between">
-                          <div className={`w-9 h-9 rounded-2xl ${cat.bg} ${cat.text} flex items-center justify-center`}>
-                            {renderIcon(cat.icon, 'w-4 h-4')}
+                          <div className={`w-10 h-10 rounded-2xl ${cat.bg} ${cat.text} flex items-center justify-center`}>
+                            {renderIcon(cat.icon, 'w-5 h-5')}
                           </div>
-                          <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
+                          <span className="text-xs font-black px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300">
                             {cat.sharePct}%
                           </span>
                         </div>
                         <div>
-                          <div className="text-xs font-extrabold truncate">{cat.shortLabel}</div>
-                          <div className="text-base font-black mt-0.5">{formatINR(cat.spent, true)}</div>
+                          <div className="text-xs font-extrabold text-slate-500 dark:text-slate-400 truncate">
+                            {cat.shortLabel}
+                          </div>
+                          <div className="text-lg font-black mt-0.5">{formatINR(cat.spent, true)}</div>
                         </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                           <div
-                            className="h-full rounded-full"
+                            className="h-full rounded-full transition-all duration-500"
                             style={{ width: `${cat.sharePct}%`, backgroundColor: cat.color }}
                           />
                         </div>
@@ -2151,54 +2182,54 @@ export default function App() {
             {activeTab === 'expenses' && (
               <section className="space-y-3.5">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-extrabold">
-                    Expenses ({filteredExpenses.length})
+                  <h2 className="text-lg font-black">
+                    Bills ({filteredExpenses.length})
                   </h2>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setIsExportModalOpen(true)}
-                      className="h-9 px-3 rounded-xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
+                      className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1.5"
                     >
-                      <Printer className="w-3.5 h-3.5" />
+                      <Printer className="w-4 h-4" />
                       <span>PDF</span>
                     </button>
                     <button
                       onClick={handleExportCSV}
-                      className="h-9 px-3 rounded-xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1"
+                      className="h-10 px-3.5 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1.5"
                     >
-                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <FileSpreadsheet className="w-4 h-4" />
                       <span>CSV</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search item, vendor, family member..."
-                    className="w-full h-11 pl-10 pr-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Search bill, vendor, paid by..."
+                    className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                   <button
                     onClick={() => setSelectedCategoryFilter('all')}
-                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                    className={`h-9 px-3.5 rounded-full text-xs font-extrabold shrink-0 ${
                       selectedCategoryFilter === 'all'
                         ? 'bg-indigo-600 text-white'
                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                     }`}
                   >
-                    All Categories
+                    All
                   </button>
                   {activeSpaceCategories.map((cat) => (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategoryFilter(cat.id)}
-                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                      className={`h-9 px-3.5 rounded-full text-xs font-extrabold shrink-0 ${
                         selectedCategoryFilter === cat.id
                           ? 'bg-indigo-600 text-white'
                           : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
@@ -2209,15 +2240,15 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {['all', 'Material', 'Labour', 'General'].map((ct) => (
                     <button
                       key={ct}
                       onClick={() => setCostTypeFilter(ct)}
-                      className={`h-7 px-2.5 rounded-xl text-[11px] font-extrabold shrink-0 border ${
+                      className={`h-8 px-3 rounded-xl text-xs font-extrabold shrink-0 ${
                         costTypeFilter === ct
-                          ? 'bg-orange-600 text-white border-orange-600'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-transparent'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
                       {ct === 'all' ? 'All Types' : ct}
@@ -2227,21 +2258,25 @@ export default function App() {
                     <button
                       key={st}
                       onClick={() => setStatusFilter(st)}
-                      className={`h-7 px-2.5 rounded-xl text-[11px] font-extrabold shrink-0 border ${
+                      className={`h-8 px-3 rounded-xl text-xs font-extrabold shrink-0 ${
                         statusFilter === st
-                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-transparent'
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                          : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
-                      {st === 'all' ? 'Any Status' : st}
+                      {st === 'all' ? 'All Status' : st}
                     </button>
                   ))}
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {filteredExpenses.length === 0 ? (
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 text-center text-xs font-bold text-slate-400">
-                      No matching expenses found. Tap + to add a bill.
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-10 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-700">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 mx-auto flex items-center justify-center">
+                        <Receipt className="w-6 h-6" />
+                      </div>
+                      <div className="text-sm font-black">No bills yet</div>
+                      <p className="text-xs text-slate-400">Tap the + button at the bottom to add your first entry.</p>
                     </div>
                   ) : (
                     filteredExpenses.map((exp) => {
@@ -2251,50 +2286,47 @@ export default function App() {
                       return (
                         <div
                           key={exp.id}
-                          className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm space-y-2.5"
+                          className="bg-white dark:bg-slate-800/90 p-4 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm space-y-3"
                         >
-                          <div className="flex items-start justify-between gap-2.5">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <div className={`w-10 h-10 rounded-2xl ${catObj?.bg} ${catObj?.text} flex items-center justify-center shrink-0`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className={`w-11 h-11 rounded-2xl ${catObj?.bg} ${catObj?.text} flex items-center justify-center shrink-0`}>
                                 {renderIcon(catObj?.icon || Receipt, 'w-5 h-5')}
                               </div>
                               <div className="min-w-0">
-                                <h4 className="text-sm font-extrabold leading-snug">{exp.title}</h4>
-                                <div className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                                <h4 className="text-sm font-black leading-snug">{exp.title}</h4>
+                                <div className="text-xs font-semibold text-slate-400 mt-0.5 truncate">
                                   {exp.vendor} • {exp.date}
                                 </div>
                               </div>
                             </div>
 
                             <div className="text-right shrink-0">
-                              <div className="text-sm font-black">{formatINR(exp.amount)}</div>
-                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${stObj.badgeBg}`}>
+                              <div className="text-base font-black">{formatINR(exp.amount)}</div>
+                              <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${stObj.badgeBg}`}>
                                 {exp.status}
                               </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60 text-[11px]">
+                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-700/60 text-xs">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 font-bold">
+                              <span className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 font-bold text-[11px]">
                                 {exp.mode}
                               </span>
-                              <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-bold">
-                                {exp.costType || 'Material'}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-300 font-bold">
-                                By {exp.paidBy || 'You'}
+                              <span className="px-2.5 py-1 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-bold text-[11px]">
+                                {exp.paidBy || 'You'}
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                               {exp.receipt && (
                                 <button
                                   onClick={() => setReceiptPreviewUrl(exp.receipt || null)}
-                                  className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600"
+                                  className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center"
                                   title="View Bill Photo"
                                 >
-                                  <ImageIcon className="w-3.5 h-3.5" />
+                                  <ImageIcon className="w-4 h-4" />
                                 </button>
                               )}
                               <button
@@ -2303,24 +2335,24 @@ export default function App() {
                                     `*HomeLedger Payment Receipt*\nItem: ${exp.title}\nAmount: *${formatINR(exp.amount)}* (${exp.status})\nVendor: ${exp.vendor}\nMode: ${exp.mode} | Date: ${exp.date}`
                                   )
                                 }
-                                className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600"
+                                className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center"
                                 title="Share on WhatsApp"
                               >
-                                <ArrowUpRight className="w-3.5 h-3.5" />
+                                <ArrowUpRight className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => openAddExpenseDrawer(exp)}
-                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center"
                                 title="Edit"
                               >
-                                <Edit3 className="w-3.5 h-3.5" />
+                                <Edit3 className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteExpense(exp.id)}
-                                className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500"
+                                className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"
                                 title="Delete"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -2337,87 +2369,97 @@ export default function App() {
               <section className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-extrabold">Contractors & Vendors</h2>
-                    <p className="text-xs text-slate-400">
-                      Pending Dues: <strong className="text-rose-500">{formatINR(analytics.totalVendorDues)}</strong>
+                    <h2 className="text-lg font-black">Vendors</h2>
+                    <p className="text-xs font-bold text-slate-400">
+                      Balance Due: <strong className="text-rose-500">{formatINR(analytics.totalVendorDues)}</strong>
                     </p>
                   </div>
                   <button
                     onClick={() => setIsVendorModalOpen(true)}
-                    className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
+                    className="h-11 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add Vendor</span>
                   </button>
                 </div>
 
-                {analytics.vendorStats.map((v) => (
-                  <div
-                    key={v.id}
-                    className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-black">{v.name}</h3>
-                        <p className="text-xs text-slate-400">{v.trade}</p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          handleShareWhatsApp(
-                            `*HomeLedger Vendor Ledger — ${v.name}*\nAgreed Quote: ${formatINR(v.quoted)}\nPaid So Far: *${formatINR(v.paidToVendor)}*\nBalance Payable: *${formatINR(v.balanceRemaining)}*`
-                          )
-                        }
-                        className="h-8 px-2.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold flex items-center gap-1"
-                      >
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                        <span>Share</span>
-                      </button>
+                {analytics.vendorStats.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-800 rounded-3xl p-10 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-700">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 mx-auto flex items-center justify-center">
+                      <HardHat className="w-6 h-6" />
                     </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs font-bold mb-1">
-                        <span className="text-emerald-600">Paid: {formatINR(v.paidToVendor)}</span>
-                        <span className="text-rose-500">Due: {formatINR(v.balanceRemaining)}</span>
-                      </div>
-                      <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${v.progressPct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {v.milestones.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        {v.milestones.map((ms) => (
-                          <div
-                            key={ms.id}
-                            className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-700/60"
-                          >
-                            <div>
-                              <div className="text-xs font-extrabold">{ms.label}</div>
-                              <div className="text-[10px] font-semibold text-slate-400">
-                                {formatINR(ms.amount)} • Due {ms.dueDate}
-                              </div>
-                            </div>
-                            {ms.status === 'Paid' ? (
-                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 text-[10px] font-extrabold">
-                                Paid ✓
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleMarkMilestonePaid(v, ms)}
-                                className="h-8 px-3 rounded-xl bg-indigo-600 text-white text-[11px] font-extrabold"
-                              >
-                                Pay Now
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div className="text-sm font-black">No contractors added yet</div>
+                    <p className="text-xs text-slate-400">Tap "Add Vendor" above to track quotes & milestone payouts.</p>
                   </div>
-                ))}
+                ) : (
+                  analytics.vendorStats.map((v) => (
+                    <div
+                      key={v.id}
+                      className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-base font-black">{v.name}</h3>
+                          <p className="text-xs font-semibold text-slate-400">{v.trade}</p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            handleShareWhatsApp(
+                              `*HomeLedger Vendor Ledger — ${v.name}*\nAgreed Quote: ${formatINR(v.quoted)}\nPaid So Far: *${formatINR(v.paidToVendor)}*\nBalance Payable: *${formatINR(v.balanceRemaining)}*`
+                            )
+                          }
+                          className="h-9 px-3 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold flex items-center gap-1"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                          <span>Share</span>
+                        </button>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-extrabold mb-1.5">
+                          <span className="text-emerald-600">Paid: {formatINR(v.paidToVendor)}</span>
+                          <span className="text-rose-500">Due: {formatINR(v.balanceRemaining)}</span>
+                        </div>
+                        <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full"
+                            style={{ width: `${v.progressPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {v.milestones.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          {v.milestones.map((ms) => (
+                            <div
+                              key={ms.id}
+                              className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-700/60"
+                            >
+                              <div>
+                                <div className="text-xs font-extrabold">{ms.label}</div>
+                                <div className="text-[11px] font-semibold text-slate-400">
+                                  {formatINR(ms.amount)} • {ms.dueDate}
+                                </div>
+                              </div>
+                              {ms.status === 'Paid' ? (
+                                <span className="px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-600 text-xs font-extrabold">
+                                  Paid ✓
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleMarkMilestonePaid(v, ms)}
+                                  className="h-9 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
+                                >
+                                  Pay Now
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </section>
             )}
 
@@ -2425,98 +2467,105 @@ export default function App() {
             {activeTab === 'analytics' && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-extrabold">Visual Analytics</h2>
+                  <h2 className="text-lg font-black">Visual Analytics</h2>
                   <button
                     onClick={() => setIsExportModalOpen(true)}
-                    className="h-9 px-3 rounded-xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
+                    className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1.5"
                   >
-                    <Printer className="w-3.5 h-3.5" />
+                    <Printer className="w-4 h-4" />
                     <span>PDF Report</span>
                   </button>
                 </div>
 
                 <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Actual Spend by Category (₹ in Thousands)
+                    Spend by Category (₹k)
                   </h3>
                   <NativeBarChart data={analytics.barChartData} />
                 </div>
 
                 <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Cumulative Spend Curve (₹ in Thousands)
+                    Cumulative Spend Trend (₹k)
                   </h3>
                   <NativeAreaChart data={analytics.trendData} />
                 </div>
 
-                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-2">
+                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Payment Mode Split (UPI, Bank, Cash & Card)
+                    Payment Mode Split
                   </h3>
-                  <div className="grid grid-cols-2 items-center gap-2">
-                    <div className="h-40 flex items-center justify-center">
-                      <NativeDonutChart data={analytics.modeChartData} size={132} strokeWidth={18} />
+                  {analytics.modeChartData.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-400 text-center py-6">No payments logged yet</p>
+                  ) : (
+                    <div className="grid grid-cols-2 items-center gap-3">
+                      <div className="flex items-center justify-center">
+                        <NativeDonutChart data={analytics.modeChartData} size={136} strokeWidth={18} />
+                      </div>
+                      <div className="space-y-2.5">
+                        {analytics.modeChartData.map((m) => (
+                          <div key={m.name} className="flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-2 font-bold">
+                              <span
+                                className="w-3 h-3 rounded-full shrink-0"
+                                style={{ backgroundColor: m.color }}
+                              />
+                              {m.name}
+                            </span>
+                            <span className="font-black">{formatINR(m.value, true)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {analytics.modeChartData.map((m) => (
-                        <div key={m.name} className="flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-1.5 font-bold">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full shrink-0"
-                              style={{ backgroundColor: m.color }}
-                            />
-                            {m.name}
-                          </span>
-                          <span className="font-black">{formatINR(m.value, true)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-2.5">
+                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Family & Co-Owner Spend Split
+                    Paid By Family Split
                   </h3>
-                  {analytics.memberChartData.map((m) => {
-                    const pct =
-                      analytics.totalSpent > 0 ? Math.round((m.total / analytics.totalSpent) * 100) : 0;
-                    return (
-                      <div key={m.id} className="space-y-1">
-                        <div className="flex justify-between text-xs font-bold">
-                          <span>{m.label} ({m.count} bills)</span>
-                          <span>{formatINR(m.total)} ({pct}%)</span>
+                  {analytics.memberChartData.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-400 text-center py-4">No entries yet</p>
+                  ) : (
+                    analytics.memberChartData.map((m) => {
+                      const pct =
+                        analytics.totalSpent > 0 ? Math.round((m.total / analytics.totalSpent) * 100) : 0;
+                      return (
+                        <div key={m.id} className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-extrabold">
+                            <span>{m.label} ({m.count})</span>
+                            <span>{formatINR(m.total)} ({pct}%)</span>
+                          </div>
+                          <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, backgroundColor: m.color }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, backgroundColor: m.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </section>
             )}
 
-            {/* TAB 5: SMART CARPENTRY MAJURI (WEEKLY ADVANCE KHATA + ROOMS) */}
+            {/* TAB 5: SMART CARPENTRY MAJURI (CLEAN MOBILE KHATA + ROOMS) */}
             {activeTab === 'majuri' && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                      Running Khata • Measurements vs. Hafta
+                      Running Khata • H × W × Rate
                     </span>
-                    <h2 className="text-lg font-extrabold">Carpenter Majuri</h2>
+                    <h2 className="text-lg font-black">Carpenter Majuri</h2>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={handlePrintGraphicalPDF}
-                      title="Export Graphical Majuri & Khata PDF"
-                      className="h-10 px-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm"
+                      className="h-10 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
                     >
-                      <Printer className="w-3.5 h-3.5" />
+                      <Printer className="w-4 h-4" />
                       <span>PDF</span>
                     </button>
                     <button
@@ -2532,380 +2581,356 @@ export default function App() {
                           `*HomeLedger Carpenter Majuri Khata*\nTotal Measured Work: ${majuriSummary.totalSqft} sq.ft = *${formatINR(majuriSummary.totalWorkBill)}*\nTotal Weekly Advances Paid: *${formatINR(majuriSummary.totalWeeklyAdvancePaid)}*\n${balanceLine}\n\n*Room-Wise Measurement:*\n${roomLines}`
                         );
                       }}
-                      className="h-10 px-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm"
+                      className="h-10 px-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1"
                     >
-                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <ArrowUpRight className="w-4 h-4" />
                       <span>Share</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Running Khata Summary Card */}
-                <div className="bg-gradient-to-br from-orange-600 to-amber-600 text-white rounded-3xl p-4 shadow-lg shadow-orange-600/20 space-y-3">
+                {/* Running Khata Hero Card */}
+                <div className="bg-gradient-to-br from-orange-600 to-amber-500 text-white rounded-3xl p-5 shadow-lg shadow-orange-600/20 space-y-3.5">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-orange-100">
-                        Total Measured Work ({majuriSummary.totalSqft} sq.ft)
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-100">
+                        Total Work Bill ({majuriSummary.totalSqft} ft²)
                       </span>
-                      <div className="text-2xl font-black mt-0.5">
+                      <div className="text-3xl font-black mt-0.5">
                         {formatINR(majuriSummary.totalWorkBill)}
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-white/20 text-xs font-extrabold">
-                      {majuriSummary.settledPct}% Settled
+                    <span className="px-3 py-1 rounded-full bg-white/20 text-xs font-black">
+                      {majuriSummary.settledPct}% Paid
                     </span>
                   </div>
 
-                  <div className="w-full h-2.5 rounded-full bg-black/20 overflow-hidden">
+                  <div className="w-full h-3 rounded-full bg-black/20 overflow-hidden">
                     <div
                       className="h-full bg-white rounded-full transition-all duration-500"
                       style={{ width: `${majuriSummary.settledPct}%` }}
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className="p-2.5 rounded-2xl bg-white/15">
-                      <span className="text-[10px] font-bold uppercase text-orange-100 block">
-                        Weekly Advances Paid
+                  <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+                    <div className="p-3 rounded-2xl bg-white/15">
+                      <span className="text-[10px] font-extrabold uppercase text-orange-100 block">
+                        Hafta Paid
                       </span>
-                      <span className="text-sm font-black">
+                      <span className="text-base font-black">
                         {formatINR(majuriSummary.totalWeeklyAdvancePaid)}
                       </span>
                     </div>
-                    <div className="p-2.5 rounded-2xl bg-white/15">
-                      <span className="text-[10px] font-bold uppercase text-orange-100 block">
-                        {majuriSummary.netBalance >= 0 ? 'Net Balance Payable' : 'Extra Advance Credit'}
+                    <div className="p-3 rounded-2xl bg-white/15">
+                      <span className="text-[10px] font-extrabold uppercase text-orange-100 block">
+                        {majuriSummary.netBalance >= 0 ? 'Balance Due' : 'Extra Credit'}
                       </span>
-                      <span className="text-sm font-black">
+                      <span className="text-base font-black">
                         {formatINR(Math.abs(majuriSummary.netBalance))}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Room-Wise Majuri Cards */}
-                <div className="grid grid-cols-2 gap-2.5">
+                {/* Horizontal Swipeable Room Filter Pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  <button
+                    onClick={() => setSelectedMajuriRoomFilter('all')}
+                    className={`h-10 px-4 rounded-2xl text-xs font-extrabold shrink-0 border ${
+                      selectedMajuriRoomFilter === 'all'
+                        ? 'bg-orange-600 text-white border-orange-600'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    All Rooms ({majuriSummary.totalSqft} ft²)
+                  </button>
                   {majuriSummary.rooms.map((room) => {
                     const isSelected = selectedMajuriRoomFilter === room.id;
                     return (
                       <button
                         key={room.id}
-                        onClick={() =>
-                          setSelectedMajuriRoomFilter(isSelected ? 'all' : room.id)
-                        }
-                        className={`text-left p-3 rounded-3xl border transition-all space-y-2 ${
+                        onClick={() => setSelectedMajuriRoomFilter(isSelected ? 'all' : room.id)}
+                        className={`h-10 px-3.5 rounded-2xl text-xs font-extrabold shrink-0 border flex items-center gap-1.5 ${
                           isSelected
-                            ? 'bg-orange-500/10 border-orange-500'
-                            : 'bg-white dark:bg-slate-800/90 border-slate-200/70 dark:border-slate-700/70'
+                            ? 'bg-orange-600 text-white border-orange-600'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className={`w-8 h-8 rounded-xl ${room.bg} ${room.text} flex items-center justify-center`}>
-                            {renderIcon(room.icon, 'w-4 h-4')}
-                          </div>
-                          <span className="text-[10px] font-extrabold text-slate-400">
-                            {room.sqft} ft²
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-xs font-extrabold truncate">{room.shortLabel}</div>
-                          <div className="text-sm font-black">{formatINR(room.amount, true)}</div>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${room.sharePct}%`, backgroundColor: room.color }}
-                          />
-                        </div>
+                        {renderIcon(room.icon, 'w-3.5 h-3.5')}
+                        <span>{room.shortLabel}</span>
+                        <span className="opacity-75">({formatINR(room.amount, true)})</span>
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Smart Height × Width × Rate Calculator Form */}
-                <form
-                  onSubmit={handleSaveMajuriEntry}
-                  className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                      + Add Room Measurement (H × W × Rate)
-                    </h3>
-                    <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-0.5 text-[11px] font-extrabold">
-                      {(['ft', 'in'] as MeasurementUnit[]).map((u) => (
-                        <button
-                          key={u}
-                          type="button"
-                          onClick={() => setMjUnit(u)}
-                          className={`px-2.5 py-1 rounded-lg ${
-                            mjUnit === u
-                              ? 'bg-orange-600 text-white'
-                              : 'text-slate-500'
-                          }`}
+                {/* Unified Segmented Action Card: Switch between + Measurement & + Pay Hafta */}
+                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3.5">
+                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900">
+                    <button
+                      type="button"
+                      onClick={() => setMajuriFormMode('measure')}
+                      className={`h-10 rounded-xl text-xs font-extrabold transition-all ${
+                        majuriFormMode === 'measure'
+                          ? 'bg-orange-600 text-white shadow-sm'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      + Measure Work
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMajuriFormMode('advance')}
+                      className={`h-10 rounded-xl text-xs font-extrabold transition-all ${
+                        majuriFormMode === 'advance'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      + Pay Weekly Hafta
+                    </button>
+                  </div>
+
+                  {majuriFormMode === 'measure' ? (
+                    <form onSubmit={handleSaveMajuriEntry} className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <select
+                          value={mjRoomId}
+                          onChange={(e) => setMjRoomId(e.target.value)}
+                          className="flex-1 h-12 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                         >
-                          {u === 'ft' ? 'Feet' : 'Inches'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                          {MAJURI_ROOMS.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex rounded-2xl bg-slate-100 dark:bg-slate-900 p-1 text-xs font-extrabold">
+                          {(['ft', 'in'] as MeasurementUnit[]).map((u) => (
+                            <button
+                              key={u}
+                              type="button"
+                              onClick={() => setMjUnit(u)}
+                              className={`h-10 px-3 rounded-xl ${
+                                mjUnit === u ? 'bg-orange-600 text-white' : 'text-slate-500'
+                              }`}
+                            >
+                              {u === 'ft' ? 'Feet' : 'Inch'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={mjRoomId}
-                      onChange={(e) => setMjRoomId(e.target.value)}
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                    >
-                      {MAJURI_ROOMS.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      value={mjItem}
-                      onChange={(e) => setMjItem(e.target.value)}
-                      placeholder="Work item (e.g. Wardrobe)"
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="number"
-                      step="any"
-                      value={mjHeight}
-                      onChange={(e) => setMjHeight(e.target.value)}
-                      placeholder={`Height (${mjUnit})`}
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                    />
-                    <input
-                      type="number"
-                      step="any"
-                      value={mjWidth}
-                      onChange={(e) => setMjWidth(e.target.value)}
-                      placeholder={`Width (${mjUnit})`}
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                    />
-                    <input
-                      type="number"
-                      step="any"
-                      value={mjRate}
-                      onChange={(e) => setMjRate(e.target.value)}
-                      placeholder="Rate ₹/ft²"
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400 block">
-                        Calculated Area & Bill
-                      </span>
-                      <span className="text-sm font-black">
-                        {liveMajuriCalc.sqft} sq.ft × ₹{mjRate || 0} = {formatINR(liveMajuriCalc.amount)}
-                      </span>
-                    </div>
-                    <button
-                      type="submit"
-                      className="h-10 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold"
-                    >
-                      Save Item
-                    </button>
-                  </div>
-                </form>
-
-                {/* Weekly Carpenter Advance (Hafta) Form */}
-                <form
-                  onSubmit={handleSaveCarpenterAdvance}
-                  className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                      + Log Weekly Carpenter Advance (Hafta)
-                    </h3>
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer">
                       <input
-                        type="checkbox"
-                        checked={advSyncToBills}
-                        onChange={(e) => setAdvSyncToBills(e.target.checked)}
-                        className="rounded text-emerald-600"
+                        type="text"
+                        value={mjItem}
+                        onChange={(e) => setMjItem(e.target.value)}
+                        placeholder="Work item (e.g. Wardrobe, TV Unit, Safety Door)"
+                        className="w-full h-12 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                       />
-                      <span>Sync to Bills</span>
-                    </label>
-                  </div>
 
-                  <div className="flex gap-1.5">
-                    {[5000, 10000, 20000, 30000].map((chip) => (
-                      <button
-                        key={chip}
-                        type="button"
-                        onClick={() =>
-                          setAdvAmount(String((Number(advAmount) || 0) + chip))
-                        }
-                        className="flex-1 h-8 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold"
-                      >
-                        +₹{chip / 1000}k
-                      </button>
-                    ))}
-                  </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          value={mjHeight}
+                          onChange={(e) => setMjHeight(e.target.value)}
+                          placeholder={`H (${mjUnit})`}
+                          className="h-12 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-black text-center"
+                        />
+                        <input
+                          type="number"
+                          step="any"
+                          value={mjWidth}
+                          onChange={(e) => setMjWidth(e.target.value)}
+                          placeholder={`W (${mjUnit})`}
+                          className="h-12 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-black text-center"
+                        />
+                        <input
+                          type="number"
+                          step="any"
+                          value={mjRate}
+                          onChange={(e) => setMjRate(e.target.value)}
+                          placeholder="₹/ft²"
+                          className="h-12 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-black text-center"
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="number"
-                      value={advAmount}
-                      onChange={(e) => setAdvAmount(e.target.value)}
-                      placeholder="Advance Amount (₹)"
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                    />
-                    <input
-                      type="text"
-                      value={advWeekLabel}
-                      onChange={(e) => setAdvWeekLabel(e.target.value)}
-                      placeholder={`Week ${carpenterAdvances.length + 1} Advance`}
-                      className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    />
-                  </div>
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+                        <div>
+                          <span className="text-[10px] font-extrabold uppercase text-orange-600 dark:text-orange-400 block">
+                            {liveMajuriCalc.sqft} sq.ft × ₹{mjRate || 0}
+                          </span>
+                          <span className="text-lg font-black">{formatINR(liveMajuriCalc.amount)}</span>
+                        </div>
+                        <button
+                          type="submit"
+                          className="h-11 px-5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold shadow-sm"
+                        >
+                          Add Bill
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleSaveCarpenterAdvance} className="space-y-3">
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[5000, 10000, 20000, 30000].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setAdvAmount(String((Number(advAmount) || 0) + chip))}
+                            className="h-10 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold"
+                          >
+                            +₹{chip / 1000}k
+                          </button>
+                        ))}
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="date"
-                      value={advDate}
-                      onChange={(e) => setAdvDate(e.target.value)}
-                      className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    />
-                    <input
-                      type="text"
-                      value={advNotes}
-                      onChange={(e) => setAdvNotes(e.target.value)}
-                      placeholder="Note (e.g. Saturday Hafta)"
-                      className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    />
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          value={advAmount}
+                          onChange={(e) => setAdvAmount(e.target.value)}
+                          placeholder="Amount (₹)"
+                          className="h-12 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-black"
+                        />
+                        <input
+                          type="text"
+                          value={advWeekLabel}
+                          onChange={(e) => setAdvWeekLabel(e.target.value)}
+                          placeholder={`Week ${carpenterAdvances.length + 1} Hafta`}
+                          className="h-12 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <select
-                      value={advMode}
-                      onChange={(e) => setAdvMode(e.target.value)}
-                      className="h-10 px-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    >
-                      <option value="UPI">UPI</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Bank Transfer">Bank</option>
-                    </select>
-                    <select
-                      value={advPaidBy}
-                      onChange={(e) => setAdvPaidBy(e.target.value)}
-                      className="h-10 px-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    >
-                      {FAMILY_MEMBERS.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          By {m.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
-                    >
-                      Pay Hafta
-                    </button>
-                  </div>
-                </form>
+                      <div className="grid grid-cols-3 gap-2">
+                        <select
+                          value={advMode}
+                          onChange={(e) => setAdvMode(e.target.value)}
+                          className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        >
+                          <option value="UPI">UPI</option>
+                          <option value="Cash">Cash</option>
+                          <option value="Bank Transfer">Bank</option>
+                        </select>
+                        <input
+                          type="date"
+                          value={advDate}
+                          onChange={(e) => setAdvDate(e.target.value)}
+                          className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                        <button
+                          type="submit"
+                          className="h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm"
+                        >
+                          Save Hafta
+                        </button>
+                      </div>
+
+                      <label className="flex items-center justify-between px-1 text-xs font-bold text-slate-500 cursor-pointer">
+                        <span>Also add to Interior Labour Bills</span>
+                        <input
+                          type="checkbox"
+                          checked={advSyncToBills}
+                          onChange={(e) => setAdvSyncToBills(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600"
+                        />
+                      </label>
+                    </form>
+                  )}
+                </div>
 
                 {/* Measured Room Items List */}
                 <div className="space-y-2">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Measured Work Items ({majuriEntries.length})
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">
+                    Measured Items ({majuriEntries.length})
                   </h3>
-                  {majuriEntries
-                    .filter((m) =>
-                      selectedMajuriRoomFilter === 'all'
-                        ? true
-                        : m.roomId === selectedMajuriRoomFilter
-                    )
-                    .map((m) => {
-                      const room = MAJURI_ROOMS.find((r) => r.id === m.roomId);
-                      return (
-                        <div
-                          key={m.id}
-                          className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
-                        >
-                          <div>
-                            <span className="text-[10px] font-extrabold uppercase text-orange-600">
-                              {room?.label}
-                            </span>
-                            <div className="text-xs font-extrabold">{m.item}</div>
-                            <div className="text-[11px] text-slate-400">
-                              {m.height}{m.unit} × {m.width}{m.unit} = {m.sqft} ft² @ ₹{m.rate}/ft²
+                  {majuriEntries.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
+                      No measurements logged yet. Enter Height × Width above.
+                    </div>
+                  ) : (
+                    majuriEntries
+                      .filter((m) =>
+                        selectedMajuriRoomFilter === 'all' ? true : m.roomId === selectedMajuriRoomFilter
+                      )
+                      .map((m) => {
+                        const room = MAJURI_ROOMS.find((r) => r.id === m.roomId);
+                        return (
+                          <div
+                            key={m.id}
+                            className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase text-orange-600">
+                                {room?.label}
+                              </span>
+                              <div className="text-sm font-black truncate">{m.item}</div>
+                              <div className="text-xs text-slate-400">
+                                {m.height}{m.unit} × {m.width}{m.unit} = {m.sqft} ft² @ ₹{m.rate}/ft²
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-sm font-black">{formatINR(m.amount)}</span>
+                              <button
+                                onClick={() => handleDeleteMajuriEntry(m.id)}
+                                className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-black">{formatINR(m.amount)}</span>
-                            <button
-                              onClick={() => handleDeleteMajuriEntry(m.id)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                  )}
                 </div>
 
                 {/* Weekly Advances History List */}
                 <div className="space-y-2">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">
                     Weekly Advances Paid ({carpenterAdvances.length})
                   </h3>
-                  {carpenterAdvances.map((a) => (
-                    <div
-                      key={a.id}
-                      className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
-                    >
-                      <div>
-                        <div className="text-xs font-extrabold">{a.weekLabel}</div>
-                        <div className="text-[11px] text-slate-400">
-                          {a.date} • {a.mode} • By {a.paidBy}
+                  {carpenterAdvances.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
+                      No weekly advances recorded yet.
+                    </div>
+                  ) : (
+                    carpenterAdvances.map((a) => (
+                      <div
+                        key={a.id}
+                        className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-black truncate">{a.weekLabel}</div>
+                          <div className="text-xs text-slate-400">
+                            {a.date} • {a.mode}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-black text-emerald-600">
+                            {formatINR(a.amount)}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteCarpenterAdvance(a.id)}
+                            className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-emerald-600">
-                          {formatINR(a.amount)}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteCarpenterAdvance(a.id)}
-                          className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </section>
             )}
           </main>
 
-          {/* ================= FLOATING QUICK ADD BUTTON (+) ================= */}
-          <button
-            onClick={() => openAddExpenseDrawer()}
-            aria-label="Add Expense"
-            className="fixed bottom-20 right-4 sm:right-[calc(50%-208px)] z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-600/35 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-          >
-            <Plus className="w-7 h-7" />
-          </button>
-
-          {/* ================= BOTTOM NAVIGATION BAR (5 TABS) ================= */}
-          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800 px-2 py-2 grid grid-cols-5 gap-1">
+          {/* ================= INTEGRATED MOBILE BOTTOM DOCK WITH CENTER (+) ================= */}
+          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 px-2 pt-2 pb-3 grid grid-cols-5 items-center gap-1">
             {(
               [
-                { id: 'overview', label: 'Overview', icon: LayoutGrid },
-                { id: 'expenses', label: 'Expenses', icon: Receipt },
-                { id: 'majuri', label: 'Majuri', icon: Ruler },
-                { id: 'vendors', label: 'Vendors', icon: HardHat },
-                { id: 'analytics', label: 'Charts', icon: BarChart3 }
+                { id: 'overview', label: 'Home', icon: LayoutGrid },
+                { id: 'expenses', label: 'Bills', icon: Receipt }
               ] as { id: ActiveTab; label: string; icon: React.ComponentType<IconProps> }[]
             ).map((tab) => {
               const active = activeTab === tab.id;
@@ -2915,12 +2940,46 @@ export default function App() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
                     active
-                      ? 'bg-indigo-600/10 text-indigo-600 dark:text-indigo-400'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                      ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   {renderIcon(tab.icon, 'w-5 h-5')}
-                  <span className="text-[10px] font-extrabold mt-0.5">{tab.label}</span>
+                  <span className="text-[11px] font-extrabold mt-1">{tab.label}</span>
+                </button>
+              );
+            })}
+
+            {/* Center Docked Quick-Add Button */}
+            <div className="flex justify-center">
+              <button
+                onClick={() => openAddExpenseDrawer()}
+                aria-label="Add Expense"
+                className="-mt-6 w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-600/35 flex items-center justify-center active:scale-95 transition-transform border-4 border-slate-50 dark:border-slate-900"
+              >
+                <Plus className="w-7 h-7" />
+              </button>
+            </div>
+
+            {(
+              [
+                { id: 'majuri', label: 'Majuri', icon: Ruler },
+                { id: 'vendors', label: 'Vendors', icon: HardHat }
+              ] as { id: ActiveTab; label: string; icon: React.ComponentType<IconProps> }[]
+            ).map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
+                    active
+                      ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {renderIcon(tab.icon, 'w-5 h-5')}
+                  <span className="text-[11px] font-extrabold mt-1">{tab.label}</span>
                 </button>
               );
             })}
@@ -2928,14 +2987,15 @@ export default function App() {
 
           {/* ================= 3-TAP QUICK EXPENSE DRAWER ================= */}
           {isAddDrawerOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
               <form
                 onSubmit={handleSaveExpense}
                 className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
               >
+                <div className="w-10 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto -mt-1 mb-1 sm:hidden" />
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-black">
-                    {editingExpenseId ? 'Edit Expense' : 'Quick Add Expense'}
+                    {editingExpenseId ? 'Edit Bill' : 'Add New Bill'}
                   </h3>
                   <button
                     type="button"
@@ -2946,25 +3006,27 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* Big Amount Input + Quick Chips */}
                 <div className="space-y-2">
                   <div className="relative">
-                    <IndianRupee className="w-5 h-5 text-indigo-600 absolute left-4 top-1/2 -translate-y-1/2" />
+                    <IndianRupee className="w-6 h-6 text-indigo-600 absolute left-4 top-1/2 -translate-y-1/2" />
                     <input
                       type="number"
                       required
+                      autoFocus
                       value={formAmount}
                       onChange={(e) => setFormAmount(e.target.value)}
                       placeholder="0"
-                      className="w-full h-14 pl-11 pr-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-2xl font-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full h-16 pl-12 pr-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-3xl font-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-2">
                     {[500, 2000, 10000, 25000].map((amt) => (
                       <button
                         key={amt}
                         type="button"
                         onClick={() => handleQuickAddAmount(amt)}
-                        className="h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-xs font-extrabold"
+                        className="h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-xs font-extrabold active:scale-95 transition-transform"
                       >
                         +₹{amt >= 1000 ? `${amt / 1000}k` : amt}
                       </button>
@@ -2972,6 +3034,7 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Visual Category Tiles */}
                 <div className="grid grid-cols-3 gap-2">
                   {activeSpaceCategories.map((cat) => {
                     const selected = formCategory === cat.id;
@@ -2980,13 +3043,13 @@ export default function App() {
                         key={cat.id}
                         type="button"
                         onClick={() => setFormCategory(cat.id)}
-                        className={`p-2.5 rounded-2xl border flex flex-col items-center gap-1 text-center ${
+                        className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 text-center transition-all ${
                           selected
-                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                             : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                         }`}
                       >
-                        {renderIcon(cat.icon, 'w-4 h-4')}
+                        {renderIcon(cat.icon, 'w-5 h-5')}
                         <span className="text-[11px] font-extrabold truncate w-full">
                           {cat.shortLabel}
                         </span>
@@ -2995,99 +3058,116 @@ export default function App() {
                   })}
                 </div>
 
-                <div className="grid grid-cols-3 gap-1.5">
-                  {COST_TYPES.map((ct) => (
-                    <button
-                      key={ct.id}
-                      type="button"
-                      onClick={() => setFormCostType(ct.id)}
-                      className={`h-9 rounded-xl text-xs font-extrabold border ${
-                        formCostType === ct.id
-                          ? 'bg-orange-600 text-white border-orange-600'
-                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {ct.label}
-                    </button>
-                  ))}
-                </div>
-
+                {/* Item Title */}
                 <input
                   type="text"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Item description (e.g. Plywood, Hardware)"
-                  className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  placeholder="What did you buy or pay for? (optional)"
+                  className="w-full h-12 px-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                 />
 
+                {/* Payment Mode & Status Quick Row */}
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={formVendor}
-                    onChange={(e) => setFormVendor(e.target.value)}
-                    placeholder="Vendor / Shop name"
-                    className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                  />
-                  <select
-                    value={formPaidBy}
-                    onChange={(e) => setFormPaidBy(e.target.value)}
-                    className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                  >
-                    {FAMILY_MEMBERS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        Paid by {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
                   <select
                     value={formMode}
                     onChange={(e) => setFormMode(e.target.value)}
-                    className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                    className="h-12 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                   >
                     {PAYMENT_MODES.map((pm) => (
                       <option key={pm.id} value={pm.id}>
-                        {pm.label}
+                        Mode: {pm.label}
                       </option>
                     ))}
                   </select>
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as PaymentStatus)}
-                    className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                    className="h-12 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                   >
                     {PAYMENT_STATUSES.map((st) => (
                       <option key={st.id} value={st.id}>
-                        {st.label}
+                        Status: {st.label}
                       </option>
                     ))}
                   </select>
-                  <input
-                    type="date"
-                    value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                  />
                 </div>
 
-                <label className="flex items-center justify-center gap-2 h-11 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-extrabold text-slate-500 cursor-pointer">
-                  <Camera className="w-4 h-4 text-indigo-600" />
-                  <span>{formReceipt ? 'Bill Photo Attached ✓' : 'Attach Bill / Receipt Photo'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleReceiptUpload}
-                    className="hidden"
-                  />
-                </label>
+                {/* Progressive Disclosure Toggle for Extra Fields */}
+                <button
+                  type="button"
+                  onClick={() => setShowMoreExpenseFields(!showMoreExpenseFields)}
+                  className="w-full py-2 text-xs font-extrabold text-indigo-600 dark:text-indigo-400"
+                >
+                  {showMoreExpenseFields ? 'Hide extra details ▲' : '+ Vendor, Material/Labour, Date & Bill Photo ▼'}
+                </button>
+
+                {showMoreExpenseFields && (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {COST_TYPES.map((ct) => (
+                        <button
+                          key={ct.id}
+                          type="button"
+                          onClick={() => setFormCostType(ct.id)}
+                          className={`h-10 rounded-xl text-xs font-extrabold border ${
+                            formCostType === ct.id
+                              ? 'bg-orange-600 text-white border-orange-600'
+                              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {ct.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={formVendor}
+                        onChange={(e) => setFormVendor(e.target.value)}
+                        placeholder="Vendor / Shop name"
+                        className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                      />
+                      <select
+                        value={formPaidBy}
+                        onChange={(e) => setFormPaidBy(e.target.value)}
+                        className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                      >
+                        {FAMILY_MEMBERS.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            Paid by {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                      />
+                      <label className="flex items-center justify-center gap-1.5 h-11 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-extrabold text-slate-500 cursor-pointer">
+                        <Camera className="w-4 h-4 text-indigo-600" />
+                        <span>{formReceipt ? 'Photo Attached ✓' : 'Bill Photo'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleReceiptUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 <button
                   type="submit"
-                  className="w-full h-13 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-600/25"
+                  className="w-full h-14 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black text-sm shadow-lg shadow-indigo-600/25 active:scale-[0.99] transition-transform"
                 >
-                  {editingExpenseId ? 'Update Expense' : 'Save Expense'}
+                  {editingExpenseId ? 'Update Bill' : 'Save Bill'}
                 </button>
               </form>
             </div>
