@@ -315,6 +315,7 @@ interface MajuriRoomDef {
 interface MajuriEntry {
   id: string;
   roomId: string;
+  vendorName: string;
   item: string;
   unit: MeasurementUnit;
   height: number;
@@ -328,6 +329,7 @@ interface MajuriEntry {
 interface CarpenterAdvance {
   id: string;
   syncedExpenseId?: string | null;
+  vendorName: string;
   weekLabel: string;
   amount: number;
   mode: string;
@@ -513,6 +515,7 @@ export default function App() {
   const [majuriEntries, setMajuriEntries] = useState<MajuriEntry[]>(INITIAL_MAJURI_ENTRIES);
   const [carpenterAdvances, setCarpenterAdvances] = useState<CarpenterAdvance[]>(INITIAL_CARPENTER_ADVANCES);
   const [selectedMajuriRoomFilter, setSelectedMajuriRoomFilter] = useState<string>('all');
+  const [selectedMajuriVendorFilter, setSelectedMajuriVendorFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [costTypeFilter, setCostTypeFilter] = useState<string>('all');
 
@@ -559,6 +562,8 @@ export default function App() {
 
   // --- Smart Carpentry Majuri Calculator & Logger State ---
   const [mjRoomId, setMjRoomId] = useState<string>('living');
+  const [mjVendor, setMjVendor] = useState<string>('Main Carpenter');
+  const [mjCustomVendor, setMjCustomVendor] = useState<string>('');
   const [mjItem, setMjItem] = useState<string>('');
   const [mjUnit, setMjUnit] = useState<MeasurementUnit>('ft');
   const [mjHeight, setMjHeight] = useState<string>('');
@@ -566,6 +571,8 @@ export default function App() {
   const [mjRate, setMjRate] = useState<string>('350');
 
   // --- Weekly Carpenter Advance (Hafta) Form State ---
+  const [advVendor, setAdvVendor] = useState<string>('Main Carpenter');
+  const [advCustomVendor, setAdvCustomVendor] = useState<string>('');
   const [advWeekLabel, setAdvWeekLabel] = useState<string>('');
   const [advAmount, setAdvAmount] = useState<string>('');
   const [advMode, setAdvMode] = useState<string>('UPI');
@@ -1250,11 +1257,38 @@ export default function App() {
   }, [mjHeight, mjWidth, mjRate, mjUnit]);
 
   const majuriSummary = useMemo(() => {
+    const vendorNamesSet = new Set<string>(['Main Carpenter']);
+    (projects.interior?.vendors || []).forEach((v) => {
+      if (v.name?.trim()) vendorNamesSet.add(v.name.trim());
+    });
+    majuriEntries.forEach((m) => {
+      if (m.vendorName?.trim()) vendorNamesSet.add(m.vendorName.trim());
+    });
+    carpenterAdvances.forEach((a) => {
+      if (a.vendorName?.trim()) vendorNamesSet.add(a.vendorName.trim());
+    });
+    const availableVendors = Array.from(vendorNamesSet);
+
+    const activeVendor =
+      selectedMajuriVendorFilter !== 'all' && !availableVendors.includes(selectedMajuriVendorFilter)
+        ? 'all'
+        : selectedMajuriVendorFilter;
+
+    const scopedEntries =
+      activeVendor === 'all'
+        ? majuriEntries
+        : majuriEntries.filter((e) => (e.vendorName || 'Main Carpenter') === activeVendor);
+
+    const scopedAdvances =
+      activeVendor === 'all'
+        ? carpenterAdvances
+        : carpenterAdvances.filter((a) => (a.vendorName || 'Main Carpenter') === activeVendor);
+
     let totalSqft = 0;
     let totalWorkBill = 0;
 
     const byRoom = MAJURI_ROOMS.map((room) => {
-      const items = majuriEntries.filter((e) => e.roomId === room.id);
+      const items = scopedEntries.filter((e) => e.roomId === room.id);
       const roomSqft = items.reduce((s, e) => s + (Number(e.sqft) || 0), 0);
       const roomAmt = items.reduce((s, e) => s + (Number(e.amount) || 0), 0);
       totalSqft += roomSqft;
@@ -1267,7 +1301,7 @@ export default function App() {
       };
     });
 
-    const totalWeeklyAdvancePaid = carpenterAdvances.reduce(
+    const totalWeeklyAdvancePaid = scopedAdvances.reduce(
       (sum, a) => sum + (Number(a.amount) || 0),
       0
     );
@@ -1283,7 +1317,33 @@ export default function App() {
       sharePct: totalWorkBill > 0 ? Math.round((r.amount / totalWorkBill) * 100) : 0
     }));
 
+    const byVendor = availableVendors
+      .map((vName) => {
+        const vWork = majuriEntries
+          .filter((e) => (e.vendorName || 'Main Carpenter') === vName)
+          .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+        const vSqft = majuriEntries
+          .filter((e) => (e.vendorName || 'Main Carpenter') === vName)
+          .reduce((s, e) => s + (Number(e.sqft) || 0), 0);
+        const vPaid = carpenterAdvances
+          .filter((a) => (a.vendorName || 'Main Carpenter') === vName)
+          .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+        return {
+          vendorName: vName,
+          sqft: Math.round(vSqft * 10) / 10,
+          workBill: vWork,
+          advancePaid: vPaid,
+          balance: vWork - vPaid
+        };
+      })
+      .filter((v) => v.workBill > 0 || v.advancePaid > 0 || v.vendorName === 'Main Carpenter');
+
     return {
+      availableVendors,
+      activeVendor,
+      scopedEntries,
+      scopedAdvances,
+      byVendor,
       totalSqft: Math.round(totalSqft * 10) / 10,
       totalWorkBill,
       totalWeeklyAdvancePaid,
@@ -1291,7 +1351,7 @@ export default function App() {
       settledPct,
       rooms: roomsWithShare
     };
-  }, [majuriEntries, carpenterAdvances]);
+  }, [majuriEntries, carpenterAdvances, projects.interior?.vendors, selectedMajuriVendorFilter]);
 
   const handleSaveMajuriEntry = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1300,12 +1360,15 @@ export default function App() {
       return;
     }
 
+    const resolvedVendor =
+      mjVendor === '__custom__' ? mjCustomVendor.trim() || 'Main Carpenter' : mjVendor || 'Main Carpenter';
     const roomObj = MAJURI_ROOMS.find((r) => r.id === mjRoomId) || MAJURI_ROOMS[0];
     const cleanItem = mjItem.trim() || `${roomObj.label} Carpentry Work`;
 
     const newMajuri: MajuriEntry = {
       id: `mj_${Date.now()}`,
       roomId: mjRoomId,
+      vendorName: resolvedVendor,
       item: cleanItem,
       unit: mjUnit,
       height: parseFloat(mjHeight),
@@ -1321,7 +1384,11 @@ export default function App() {
     setMjItem('');
     setMjHeight('');
     setMjWidth('');
-    showToast(`Measurement ${liveMajuriCalc.sqft} sq.ft (${formatINR(liveMajuriCalc.amount)}) added to work bill!`);
+    if (mjVendor === '__custom__') {
+      setMjVendor(resolvedVendor);
+      setMjCustomVendor('');
+    }
+    showToast(`${liveMajuriCalc.sqft} sq.ft (${formatINR(liveMajuriCalc.amount)}) added for ${resolvedVendor}!`);
   };
 
   const handleDeleteMajuriEntry = (id: string) => {
@@ -1330,7 +1397,7 @@ export default function App() {
     showToast('Majuri measurement removed');
   };
 
-  // --- Log Weekly Carpenter Advance (Hafta) & Sync to Interior Labour Expenses ---
+  // --- Log Weekly Carpenter Advance (Hafta) & Sync to Selected Vendor + Interior Bills ---
   const handleSaveCarpenterAdvance = (e: React.FormEvent) => {
     e.preventDefault();
     const numAmt = Number(advAmount);
@@ -1339,20 +1406,25 @@ export default function App() {
       return;
     }
 
-    const nextWeekNum = carpenterAdvances.length + 1;
-    const cleanLabel = advWeekLabel.trim() || `Week ${nextWeekNum} Advance (Hafta)`;
+    const resolvedVendor =
+      advVendor === '__custom__' ? advCustomVendor.trim() || 'Main Carpenter' : advVendor || 'Main Carpenter';
+    const vendorAdvanceCount = carpenterAdvances.filter(
+      (a) => (a.vendorName || 'Main Carpenter') === resolvedVendor
+    ).length;
+    const cleanLabel = advWeekLabel.trim() || `Week ${vendorAdvanceCount + 1} Advance (Hafta)`;
     const advId = `ca_${Date.now()}`;
     const syncedExpenseId = advSyncToBills ? `exp_${advId}` : null;
 
     const newAdv: CarpenterAdvance = {
       id: advId,
       syncedExpenseId,
+      vendorName: resolvedVendor,
       weekLabel: cleanLabel,
       amount: numAmt,
       mode: advMode,
       paidBy: advPaidBy,
       date: advDate,
-      notes: advNotes.trim() || 'Weekly carpentry labour advance'
+      notes: advNotes.trim() || `Weekly carpentry labour advance (${resolvedVendor})`
     };
 
     const updatedAdvances = [newAdv, ...carpenterAdvances];
@@ -1360,14 +1432,32 @@ export default function App() {
 
     if (advSyncToBills && syncedExpenseId) {
       const interiorProj = projects.interior;
+      const existingVendors = interiorProj.vendors || [];
+      const hasVendorRecord = existingVendors.some(
+        (v) => v.name.toLowerCase().trim() === resolvedVendor.toLowerCase().trim()
+      );
+      const updatedVendors = hasVendorRecord
+        ? existingVendors
+        : [
+            ...existingVendors,
+            {
+              id: `v_mj_${Date.now()}`,
+              name: resolvedVendor,
+              trade: 'Carpentry Majuri / Labour',
+              quoted: 0,
+              phone: 'Not added',
+              milestones: []
+            }
+          ];
+
       const syncedExpense: ExpenseItem = {
         id: syncedExpenseId,
-        title: `Carpenter Majuri: ${cleanLabel}`,
+        title: `Majuri (${resolvedVendor}): ${cleanLabel}`,
         amount: numAmt,
         category: 'carpentry',
         costType: 'Labour',
         paidBy: advPaidBy,
-        vendor: 'Sharma Carpentry & Modular',
+        vendor: resolvedVendor,
         mode: advMode,
         status: 'Advance',
         date: advDate,
@@ -1377,6 +1467,7 @@ export default function App() {
         ...projects,
         interior: {
           ...interiorProj,
+          vendors: updatedVendors,
           expenses: [syncedExpense, ...(interiorProj.expenses || [])]
         }
       };
@@ -1386,10 +1477,14 @@ export default function App() {
     setAdvWeekLabel('');
     setAdvAmount('');
     setAdvNotes('');
+    if (advVendor === '__custom__') {
+      setAdvVendor(resolvedVendor);
+      setAdvCustomVendor('');
+    }
     showToast(
       advSyncToBills
-        ? `Weekly advance ${formatINR(numAmt)} logged & synced to Bills!`
-        : `Weekly advance ${formatINR(numAmt)} recorded!`
+        ? `${formatINR(numAmt)} Hafta paid to ${resolvedVendor} & synced to Bills!`
+        : `${formatINR(numAmt)} Hafta recorded for ${resolvedVendor}!`
     );
   };
 
@@ -1588,7 +1683,7 @@ export default function App() {
           </div>
 
           <div class="section" style="border-color:#fed7aa; background:#fffaf5;">
-            <h3 class="section-title" style="color:#ea580c;">Carpentry Majuri & Weekly Advance (Khata) Statement</h3>
+            <h3 class="section-title" style="color:#ea580c;">Carpentry Majuri & Weekly Advance (Khata) — ${majuriSummary.activeVendor === 'all' ? 'All Vendors' : majuriSummary.activeVendor}</h3>
             <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:14px;">
               <div class="kpi" style="background:#ffffff;">
                 <div class="kpi-label">Total Measured Area</div>
@@ -1628,6 +1723,7 @@ export default function App() {
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Vendor / Carpenter</th>
                   <th>Room / Area</th>
                   <th>Work Description</th>
                   <th>Dimensions (H × W)</th>
@@ -1637,13 +1733,14 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                ${majuriEntries
+                ${majuriSummary.scopedEntries
                   .map((m) => {
                     const rLabel = MAJURI_ROOMS.find((r) => r.id === m.roomId)?.label || m.roomId;
                     return `
                       <tr>
                         <td>${m.date}</td>
-                        <td><strong>${rLabel}</strong></td>
+                        <td><strong>${m.vendorName || 'Main Carpenter'}</strong></td>
+                        <td>${rLabel}</td>
                         <td>${m.item}</td>
                         <td>${m.height}${m.unit} × ${m.width}${m.unit}</td>
                         <td>${m.sqft} ft²</td>
@@ -1654,7 +1751,7 @@ export default function App() {
                   })
                   .join('')}
                 <tr style="background:#fff7ed;">
-                  <td colspan="4" style="font-weight:800; color:#9a3412;">TOTAL MEASURED CARPENTRY WORK BILL</td>
+                  <td colspan="5" style="font-weight:800; color:#9a3412;">TOTAL MEASURED CARPENTRY WORK BILL</td>
                   <td style="font-weight:800; color:#9a3412;">${majuriSummary.totalSqft} ft²</td>
                   <td>—</td>
                   <td style="text-align:right; font-weight:900; color:#ea580c;">${formatINR(majuriSummary.totalWorkBill)}</td>
@@ -1666,6 +1763,7 @@ export default function App() {
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Vendor / Carpenter</th>
                   <th>Weekly Advance / Hafta</th>
                   <th>Paid By</th>
                   <th>Payment Mode</th>
@@ -1674,12 +1772,13 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                ${carpenterAdvances
+                ${majuriSummary.scopedAdvances
                   .map(
                     (a) => `
                     <tr>
                       <td>${a.date}</td>
-                      <td><strong>${a.weekLabel}</strong></td>
+                      <td><strong>${a.vendorName || 'Main Carpenter'}</strong></td>
+                      <td>${a.weekLabel}</td>
                       <td>${a.paidBy}</td>
                       <td>${a.mode}</td>
                       <td>${a.notes || '—'}</td>
@@ -1689,11 +1788,11 @@ export default function App() {
                   )
                   .join('')}
                 <tr style="background:#ecfdf5;">
-                  <td colspan="5" style="font-weight:800; color:#065f46;">TOTAL WEEKLY ADVANCES PAID (${carpenterAdvances.length} ENTRIES)</td>
+                  <td colspan="6" style="font-weight:800; color:#065f46;">TOTAL WEEKLY ADVANCES PAID (${majuriSummary.scopedAdvances.length} ENTRIES)</td>
                   <td style="text-align:right; font-weight:900; color:#059669;">${formatINR(majuriSummary.totalWeeklyAdvancePaid)}</td>
                 </tr>
                 <tr style="background:${majuriSummary.netBalance >= 0 ? '#fff1f2' : '#fef3c7'};">
-                  <td colspan="5" style="font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#9f1239' : '#92400e'};">
+                  <td colspan="6" style="font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#9f1239' : '#92400e'};">
                     ${majuriSummary.netBalance >= 0 ? 'NET BALANCE PAYABLE TO CARPENTER (WORK BILL − ADVANCES)' : 'EXTRA ADVANCE CREDIT HELD BY CARPENTER'}
                   </td>
                   <td style="text-align:right; font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#e11d48' : '#d97706'};">
@@ -1787,16 +1886,16 @@ export default function App() {
       headers.join(','),
       ...rows,
       '',
-      ['CARPENTRY MAJURI KHATA SUMMARY', `Total Sq.Ft: ${majuriSummary.totalSqft}`, `Total Work Bill (INR): ${majuriSummary.totalWorkBill}`, `Weekly Advances Paid (INR): ${majuriSummary.totalWeeklyAdvancePaid}`, `Net Payable Balance (INR): ${majuriSummary.netBalance}`].join(','),
-      ['Date', 'Room / Area', 'Work Description', 'Height', 'Width', 'Unit', 'Area (Sq.Ft)', 'Rate (INR/Sq.Ft)', 'Majuri Amount (INR)'].join(','),
-      ...majuriEntries.map((m) => {
+      ['CARPENTRY MAJURI KHATA SUMMARY', `Vendor Scope: ${majuriSummary.activeVendor}`, `Total Sq.Ft: ${majuriSummary.totalSqft}`, `Total Work Bill (INR): ${majuriSummary.totalWorkBill}`, `Weekly Advances Paid (INR): ${majuriSummary.totalWeeklyAdvancePaid}`, `Net Payable Balance (INR): ${majuriSummary.netBalance}`].join(','),
+      ['Date', 'Vendor / Carpenter', 'Room / Area', 'Work Description', 'Height', 'Width', 'Unit', 'Area (Sq.Ft)', 'Rate (INR/Sq.Ft)', 'Majuri Amount (INR)'].join(','),
+      ...majuriSummary.scopedEntries.map((m) => {
         const rLabel = MAJURI_ROOMS.find((r) => r.id === m.roomId)?.label || m.roomId;
-        return [m.date, `"${rLabel}"`, `"${(m.item || '').replace(/"/g, '""')}"`, m.height, m.width, m.unit, m.sqft, m.rate, m.amount].join(',');
+        return [m.date, `"${(m.vendorName || 'Main Carpenter').replace(/"/g, '""')}"`, `"${rLabel}"`, `"${(m.item || '').replace(/"/g, '""')}"`, m.height, m.width, m.unit, m.sqft, m.rate, m.amount].join(',');
       }),
       '',
-      ['Date', 'Weekly Advance Label', 'Paid By', 'Mode', 'Advance Amount (INR)', 'Notes'].join(','),
-      ...carpenterAdvances.map((a) =>
-        [a.date, `"${(a.weekLabel || '').replace(/"/g, '""')}"`, a.paidBy, a.mode, a.amount, `"${(a.notes || '').replace(/"/g, '""')}"`].join(',')
+      ['Date', 'Vendor / Carpenter', 'Weekly Advance Label', 'Paid By', 'Mode', 'Advance Amount (INR)', 'Notes'].join(','),
+      ...majuriSummary.scopedAdvances.map((a) =>
+        [a.date, `"${(a.vendorName || 'Main Carpenter').replace(/"/g, '""')}"`, `"${(a.weekLabel || '').replace(/"/g, '""')}"`, a.paidBy, a.mode, a.amount, `"${(a.notes || '').replace(/"/g, '""')}"`].join(',')
       )
     ].join('\n');
 
@@ -2578,7 +2677,7 @@ export default function App() {
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                      Running Khata • H × W × Rate
+                      Vendor Khata • H × W × Rate
                     </span>
                     <h2 className="text-lg font-black">Carpenter Majuri</h2>
                   </div>
@@ -2592,15 +2691,20 @@ export default function App() {
                     </button>
                     <button
                       onClick={() => {
+                        const vendorHeading =
+                          majuriSummary.activeVendor === 'all'
+                            ? 'All Vendors'
+                            : majuriSummary.activeVendor;
                         const roomLines = majuriSummary.rooms
+                          .filter((r) => r.amount > 0)
                           .map((r) => `• ${r.label}: ${r.sqft} sq.ft = ${formatINR(r.amount)}`)
                           .join('\n');
                         const balanceLine =
                           majuriSummary.netBalance >= 0
-                            ? `Net Payable to Carpenter: *${formatINR(majuriSummary.netBalance)}*`
-                            : `Extra Advance with Carpenter: *${formatINR(Math.abs(majuriSummary.netBalance))}*`;
+                            ? `Net Payable Balance: *${formatINR(majuriSummary.netBalance)}*`
+                            : `Extra Advance Credit: *${formatINR(Math.abs(majuriSummary.netBalance))}*`;
                         handleShareWhatsApp(
-                          `*HomeLedger Carpenter Majuri Khata*\nTotal Measured Work: ${majuriSummary.totalSqft} sq.ft = *${formatINR(majuriSummary.totalWorkBill)}*\nTotal Weekly Advances Paid: *${formatINR(majuriSummary.totalWeeklyAdvancePaid)}*\n${balanceLine}\n\n*Room-Wise Measurement:*\n${roomLines}`
+                          `*HomeLedger Majuri Khata (${vendorHeading})*\nTotal Measured Work: ${majuriSummary.totalSqft} sq.ft = *${formatINR(majuriSummary.totalWorkBill)}*\nTotal Weekly Advances Paid: *${formatINR(majuriSummary.totalWeeklyAdvancePaid)}*\n${balanceLine}${roomLines ? `\n\n*Room-Wise Measurement:*\n${roomLines}` : ''}`
                         );
                       }}
                       className="h-10 px-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1"
@@ -2611,18 +2715,53 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Vendor / Carpenter Khata Switcher Pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  <button
+                    onClick={() => setSelectedMajuriVendorFilter('all')}
+                    className={`h-10 px-3.5 rounded-2xl text-xs font-extrabold shrink-0 border flex items-center gap-1.5 ${
+                      majuriSummary.activeVendor === 'all'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-sm'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <HardHat className="w-3.5 h-3.5" />
+                    <span>All Vendors</span>
+                  </button>
+                  {majuriSummary.availableVendors.map((vName) => {
+                    const isSelected = majuriSummary.activeVendor === vName;
+                    return (
+                      <button
+                        key={vName}
+                        onClick={() => {
+                          setSelectedMajuriVendorFilter(isSelected ? 'all' : vName);
+                          setMjVendor(vName);
+                          setAdvVendor(vName);
+                        }}
+                        className={`h-10 px-3.5 rounded-2xl text-xs font-extrabold shrink-0 border flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <span>{vName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Running Khata Hero Card */}
                 <div className="bg-gradient-to-br from-orange-600 to-amber-500 text-white rounded-3xl p-5 shadow-lg shadow-orange-600/20 space-y-3.5">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-100">
-                        Total Work Bill ({majuriSummary.totalSqft} ft²)
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-100 block">
+                        {majuriSummary.activeVendor === 'all' ? 'All Vendors' : majuriSummary.activeVendor} • {majuriSummary.totalSqft} ft²
                       </span>
                       <div className="text-3xl font-black mt-0.5">
                         {formatINR(majuriSummary.totalWorkBill)}
                       </div>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-white/20 text-xs font-black">
+                    <span className="px-3 py-1 rounded-full bg-white/20 text-xs font-black shrink-0">
                       {majuriSummary.settledPct}% Paid
                     </span>
                   </div>
@@ -2715,6 +2854,32 @@ export default function App() {
 
                   {majuriFormMode === 'measure' ? (
                     <form onSubmit={handleSaveMajuriEntry} className="space-y-3">
+                      {/* Vendor Selector for Measurement */}
+                      <div className="space-y-2">
+                        <select
+                          value={mjVendor}
+                          onChange={(e) => setMjVendor(e.target.value)}
+                          className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        >
+                          {majuriSummary.availableVendors.map((vName) => (
+                            <option key={vName} value={vName}>
+                              Vendor: {vName}
+                            </option>
+                          ))}
+                          <option value="__custom__">+ Enter New Carpenter / Vendor Name...</option>
+                        </select>
+                        {mjVendor === '__custom__' && (
+                          <input
+                            type="text"
+                            required
+                            value={mjCustomVendor}
+                            onChange={(e) => setMjCustomVendor(e.target.value)}
+                            placeholder="Type Carpenter / Contractor Name..."
+                            className="w-full h-11 px-3.5 rounded-2xl bg-orange-500/5 border border-orange-500/40 text-xs font-extrabold"
+                          />
+                        )}
+                      </div>
+
                       <div className="flex items-center justify-between gap-2">
                         <select
                           value={mjRoomId}
@@ -2795,6 +2960,32 @@ export default function App() {
                     </form>
                   ) : (
                     <form onSubmit={handleSaveCarpenterAdvance} className="space-y-3">
+                      {/* Vendor Selector for Weekly Advance (Hafta) */}
+                      <div className="space-y-2">
+                        <select
+                          value={advVendor}
+                          onChange={(e) => setAdvVendor(e.target.value)}
+                          className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        >
+                          {majuriSummary.availableVendors.map((vName) => (
+                            <option key={vName} value={vName}>
+                              Pay To Vendor: {vName}
+                            </option>
+                          ))}
+                          <option value="__custom__">+ Enter New Carpenter / Vendor Name...</option>
+                        </select>
+                        {advVendor === '__custom__' && (
+                          <input
+                            type="text"
+                            required
+                            value={advCustomVendor}
+                            onChange={(e) => setAdvCustomVendor(e.target.value)}
+                            placeholder="Type Carpenter / Contractor Name..."
+                            className="w-full h-11 px-3.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/40 text-xs font-extrabold"
+                          />
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-4 gap-1.5">
                         {[5000, 10000, 20000, 30000].map((chip) => (
                           <button
@@ -2820,7 +3011,7 @@ export default function App() {
                           type="text"
                           value={advWeekLabel}
                           onChange={(e) => setAdvWeekLabel(e.target.value)}
-                          placeholder={`Week ${carpenterAdvances.length + 1} Hafta`}
+                          placeholder="Week / Hafta Note"
                           className="h-12 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                         />
                       </div>
@@ -2850,7 +3041,7 @@ export default function App() {
                       </div>
 
                       <label className="flex items-center justify-between px-1 text-xs font-bold text-slate-500 cursor-pointer">
-                        <span>Also add to Interior Labour Bills</span>
+                        <span>Sync to Vendor Ledger & Interior Bills</span>
                         <input
                           type="checkbox"
                           checked={advSyncToBills}
@@ -2862,17 +3053,50 @@ export default function App() {
                   )}
                 </div>
 
+                {/* Vendor-Wise Khata Summary Breakdown (When viewing All Vendors with multiple vendors) */}
+                {majuriSummary.activeVendor === 'all' && majuriSummary.byVendor.length > 1 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">
+                      Vendor-Wise Khata Summary
+                    </h3>
+                    <div className="space-y-2">
+                      {majuriSummary.byVendor.map((vb) => (
+                        <button
+                          key={vb.vendorName}
+                          onClick={() => setSelectedMajuriVendorFilter(vb.vendorName)}
+                          className="w-full text-left bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-black truncate">{vb.vendorName}</div>
+                            <div className="text-[11px] font-bold text-slate-400">
+                              Bill: {formatINR(vb.workBill, true)} ({vb.sqft} ft²) • Paid: {formatINR(vb.advancePaid, true)}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] font-extrabold uppercase text-slate-400 block">
+                              {vb.balance >= 0 ? 'Due' : 'Credit'}
+                            </span>
+                            <span className={`text-sm font-black ${vb.balance >= 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                              {formatINR(Math.abs(vb.balance), true)}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Measured Room Items List */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">
-                    Measured Items ({majuriEntries.length})
+                    Measured Items ({majuriSummary.scopedEntries.length})
                   </h3>
-                  {majuriEntries.length === 0 ? (
+                  {majuriSummary.scopedEntries.length === 0 ? (
                     <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
                       No measurements logged yet. Enter Height × Width above.
                     </div>
                   ) : (
-                    majuriEntries
+                    majuriSummary.scopedEntries
                       .filter((m) =>
                         selectedMajuriRoomFilter === 'all' ? true : m.roomId === selectedMajuriRoomFilter
                       )
@@ -2884,10 +3108,15 @@ export default function App() {
                             className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
                           >
                             <div className="min-w-0">
-                              <span className="text-[10px] font-extrabold uppercase text-orange-600">
-                                {room?.label}
-                              </span>
-                              <div className="text-sm font-black truncate">{m.item}</div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-extrabold uppercase text-orange-600">
+                                  {room?.label}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-[10px] font-extrabold">
+                                  {m.vendorName || 'Main Carpenter'}
+                                </span>
+                              </div>
+                              <div className="text-sm font-black truncate mt-0.5">{m.item}</div>
                               <div className="text-xs text-slate-400">
                                 {m.height}{m.unit} × {m.width}{m.unit} = {m.sqft} ft² @ ₹{m.rate}/ft²
                               </div>
@@ -2910,19 +3139,22 @@ export default function App() {
                 {/* Weekly Advances History List */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">
-                    Weekly Advances Paid ({carpenterAdvances.length})
+                    Weekly Advances Paid ({majuriSummary.scopedAdvances.length})
                   </h3>
-                  {carpenterAdvances.length === 0 ? (
+                  {majuriSummary.scopedAdvances.length === 0 ? (
                     <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
                       No weekly advances recorded yet.
                     </div>
                   ) : (
-                    carpenterAdvances.map((a) => (
+                    majuriSummary.scopedAdvances.map((a) => (
                       <div
                         key={a.id}
                         className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
                       >
                         <div className="min-w-0">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-[10px] font-extrabold mb-0.5">
+                            {a.vendorName || 'Main Carpenter'}
+                          </span>
                           <div className="text-sm font-black truncate">{a.weekLabel}</div>
                           <div className="text-xs text-slate-400">
                             {a.date} • {a.mode}
