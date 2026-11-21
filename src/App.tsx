@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 
 // --- Authorized Owner Email (Strict Single-User Access Control) ---
 const ALLOWED_EMAIL = 'vivekdn2504@gmail.com';
+const WORKSPACE_CODE = 'HOME-2026';
+const LOCAL_BACKUP_KEY = 'homeledger_vault_backup_v1';
+
 const appId =
   typeof (window as unknown as { __app_id?: string }).__app_id !== 'undefined'
     ? (window as unknown as { __app_id: string }).__app_id
@@ -54,47 +57,65 @@ const detectInAppBrowser = (): boolean => {
   );
 };
 
+// --- Safe Local YYYY-MM-DD Date Helper (Avoids UTC Timezone Off-By-One Bug in IST) ---
+const getLocalTodayISO = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // --- Self-Contained Crisp Inline SVG Icons ---
 interface IconProps {
   className?: string;
 }
 
 const HomeIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 10.5L12 3l9 7.5" />
     <path d="M5 9.5V19a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
   </svg>
 );
 
 const SunIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="4" />
     <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
   </svg>
 );
 
 const MoonIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
   </svg>
 );
 
 const CloudIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
   </svg>
 );
 
 const CloudOffIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="m2 2 20 20" />
     <path d="M17.5 19H9a7 7 0 0 1-5.66-11.15" />
     <path d="M10.6 5A7 7 0 0 1 18 12.6" />
   </svg>
 );
 
+const RefreshIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </svg>
+);
+
 const LogInIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
     <polyline points="10 17 15 12 10 7" />
     <line x1="15" x2="3" y1="12" y2="12" />
@@ -102,7 +123,7 @@ const LogInIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const LogOutIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <polyline points="16 17 21 12 16 7" />
     <line x1="21" x2="9" y1="12" y2="12" />
@@ -110,14 +131,14 @@ const LogOutIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const CheckCircleIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10" />
     <path d="m9 12 2 2 4-4" />
   </svg>
 );
 
 const ArrowUpRightIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M7 7h10v10" />
     <path d="M7 17 17 7" />
   </svg>
@@ -131,14 +152,14 @@ const PlusIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 );
 
 const SearchIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="11" cy="11" r="8" />
     <path d="m21 21-4.3-4.3" />
   </svg>
 );
 
 const TrashIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -146,21 +167,21 @@ const TrashIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
 );
 
 const EditIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 20h9" />
     <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.837a.5.5 0 0 1-.62-.62l.837-2.872a2 2 0 0 1 .506-.854z" />
   </svg>
 );
 
 const CopyIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
     <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
   </svg>
 );
 
 const ImageIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
     <circle cx="9" cy="9" r="2" />
     <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
@@ -168,7 +189,7 @@ const ImageIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
 );
 
 const ReceiptIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
     <path d="M8 7h8" />
     <path d="M8 11h8" />
@@ -177,7 +198,7 @@ const ReceiptIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 );
 
 const LayoutGridIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="7" height="7" x="3" y="3" rx="1" />
     <rect width="7" height="7" x="14" y="3" rx="1" />
     <rect width="7" height="7" x="14" y="14" rx="1" />
@@ -186,7 +207,7 @@ const LayoutGridIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 );
 
 const RulerIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
     <path d="m14.5 12.5 2-2" />
     <path d="m11.5 9.5 2-2" />
@@ -196,7 +217,7 @@ const RulerIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 );
 
 const HardHatIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z" />
     <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" />
     <path d="M4 15v-3a6 6 0 0 1 6-6h0" />
@@ -205,7 +226,7 @@ const HardHatIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 );
 
 const PrinterIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
     <path d="M6 9V3h12v6" />
     <rect width="12" height="8" x="6" y="14" />
@@ -213,7 +234,7 @@ const PrinterIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const SpreadsheetIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
     <path d="M14 2v4a2 2 0 0 0 2 2h4" />
     <path d="M8 13h8" />
@@ -223,21 +244,21 @@ const SpreadsheetIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const XIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M18 6 6 18" />
     <path d="m6 6 12 12" />
   </svg>
 );
 
 const CameraIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
     <circle cx="12" cy="13" r="3" />
   </svg>
 );
 
 const SofaIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
     <path d="M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H6v-2a2 2 0 0 0-4 0Z" />
     <path d="M4 18v2" />
@@ -246,21 +267,21 @@ const SofaIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const KitchenIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z" />
     <line x1="6" x2="18" y1="17" y2="17" />
   </svg>
 );
 
 const BookOpenIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 7v14" />
     <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
   </svg>
 );
 
 const BedIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M2 4v16" />
     <path d="M2 8h18a2 2 0 0 1 2 2v10" />
     <path d="M2 17h20" />
@@ -269,7 +290,7 @@ const BedIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const DoorIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M13 4h3a2 2 0 0 1 2 2v14" />
     <path d="M2 20h3" />
     <path d="M13 12h.01" />
@@ -278,7 +299,7 @@ const DoorIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const LayersIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
     <path d="m2 12 8.58 3.91a2 2 0 0 0 1.66 0L21 12" />
     <path d="m2 17 8.58 3.91a2 2 0 0 0 1.66 0L21 17" />
@@ -286,26 +307,26 @@ const LayersIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const SparklesIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
   </svg>
 );
 
 const TvIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="20" height="15" x="2" y="7" rx="2" ry="2" />
     <polyline points="17 2 12 7 7 2" />
   </svg>
 );
 
 const DropletIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
   </svg>
 );
 
 const BrickWallIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="18" height="18" x="3" y="3" rx="2" />
     <path d="M12 9v6" />
     <path d="M16 15v6" />
@@ -318,7 +339,7 @@ const BrickWallIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const PaintRollerIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect width="16" height="6" x="2" y="2" rx="2" />
     <path d="M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
     <rect width="4" height="6" x="8" y="16" rx="1" />
@@ -326,15 +347,26 @@ const PaintRollerIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 const ZapIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
   </svg>
 );
 
 const ShieldCheckIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
     <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+const GrillGateIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M8 3v18" />
+    <path d="M12 3v18" />
+    <path d="M16 3v18" />
+    <path d="M3 9h18" />
+    <path d="M3 15h18" />
   </svg>
 );
 
@@ -357,8 +389,16 @@ const NativeDonutChart: React.FC<{
 
   if (!total || data.length === 0) {
     return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="text-slate-200 dark:text-slate-700">
-        <circle cx={center} cy={center} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          className="text-slate-200 dark:text-slate-800"
+          strokeWidth={strokeWidth}
+        />
       </svg>
     );
   }
@@ -366,15 +406,15 @@ const NativeDonutChart: React.FC<{
   let accumulatedLength = 0;
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible -rotate-90">
       <circle
         cx={center}
         cy={center}
         r={radius}
         fill="none"
         stroke="currentColor"
-        strokeWidth={strokeWidth}
         className="text-slate-100 dark:text-slate-800"
+        strokeWidth={strokeWidth}
       />
       {data.map((slice) => {
         const val = Math.max(0, Number(slice.value) || 0);
@@ -390,9 +430,10 @@ const NativeDonutChart: React.FC<{
             fill="none"
             stroke={slice.color}
             strokeWidth={strokeWidth}
-            strokeDasharray={`${segLen} ${circumference}`}
+            strokeDasharray={`${Math.max(0, segLen - 3)} ${circumference}`}
             strokeDashoffset={dashOffset}
             strokeLinecap="round"
+            className="transition-all duration-500"
           />
         );
       })}
@@ -469,6 +510,23 @@ const INTERIOR_CATEGORIES: CategoryItem[] = [
     color: '#8b5cf6',
     bg: 'bg-violet-500/15',
     text: 'text-violet-600 dark:text-violet-400'
+  },
+  {
+    id: 'grill_safety',
+    label: 'Grill & Safety Work',
+    shortLabel: 'Grill & Safety',
+    subtitle: 'Window grills, balcony safety & MS/SS gate',
+    defaultCostType: 'Turnkey',
+    presets: [
+      { label: 'Window Safety Grills (With Material)', costType: 'Turnkey' },
+      { label: 'Balcony Invisible Grill / Safety Net', costType: 'Turnkey' },
+      { label: 'MS / SS Main Safety Door', costType: 'Turnkey' },
+      { label: 'Grill Fabrication & Fitting Majuri', costType: 'Labour' }
+    ],
+    icon: GrillGateIcon,
+    color: '#475569',
+    bg: 'bg-slate-500/15',
+    text: 'text-slate-700 dark:text-slate-300'
   },
   {
     id: 'plumbing',
@@ -680,6 +738,13 @@ interface ProjectData {
   expenses: ExpenseItem[];
 }
 
+interface VaultSnapshot {
+  projects: Record<string, ProjectData>;
+  majuriEntries: MajuriEntry[];
+  carpenterAdvances: CarpenterAdvance[];
+  updatedAt: number;
+}
+
 const INITIAL_MAJURI_ENTRIES: MajuriEntry[] = [];
 const INITIAL_CARPENTER_ADVANCES: CarpenterAdvance[] = [];
 
@@ -691,6 +756,33 @@ const INITIAL_PROJECTS: Record<string, ProjectData> = {
     vendors: [],
     expenses: []
   }
+};
+
+// --- Load Cached Vault Backup from localStorage ---
+const loadLocalVaultBackup = (): VaultSnapshot | null => {
+  try {
+    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as VaultSnapshot;
+    if (parsed && parsed.projects?.interior) {
+      return parsed;
+    }
+  } catch {
+    // Ignore parse/storage errors
+  }
+  return null;
+};
+
+// --- Deduplicated Merge Helper (Preserves Local Offline Entries When Cloud Syncs) ---
+const mergeById = <T extends { id: string }>(cloudItems: T[] = [], localItems: T[] = []): T[] => {
+  const map = new Map<string, T>();
+  cloudItems.forEach((item) => {
+    if (item?.id) map.set(item.id, item);
+  });
+  localItems.forEach((item) => {
+    if (item?.id && !map.has(item.id)) map.set(item.id, item);
+  });
+  return Array.from(map.values());
 };
 
 // --- Client-Side Image Compression Helper ---
@@ -720,6 +812,9 @@ const compressReceiptImage = (file: File): Promise<string> => {
 };
 
 export default function App() {
+  // --- Hydrate Initial State from Local Backup so Refresh Never Loses Data ---
+  const initialBackup = useMemo(() => loadLocalVaultBackup(), []);
+
   // --- Theme, Large Text & Navigation State ---
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     try {
@@ -745,14 +840,34 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   // --- Core App Data State ---
-  const [projects, setProjects] = useState<Record<string, ProjectData>>(INITIAL_PROJECTS);
-  const [majuriEntries, setMajuriEntries] = useState<MajuriEntry[]>(INITIAL_MAJURI_ENTRIES);
-  const [carpenterAdvances, setCarpenterAdvances] = useState<CarpenterAdvance[]>(INITIAL_CARPENTER_ADVANCES);
+  const [projects, setProjects] = useState<Record<string, ProjectData>>(
+    initialBackup?.projects || INITIAL_PROJECTS
+  );
+  const [majuriEntries, setMajuriEntries] = useState<MajuriEntry[]>(
+    initialBackup?.majuriEntries || INITIAL_MAJURI_ENTRIES
+  );
+  const [carpenterAdvances, setCarpenterAdvances] = useState<CarpenterAdvance[]>(
+    initialBackup?.carpenterAdvances || INITIAL_CARPENTER_ADVANCES
+  );
   const [selectedMajuriRoomFilter, setSelectedMajuriRoomFilter] = useState<string>('all');
   const [selectedMajuriVendorFilter, setSelectedMajuriVendorFilter] = useState<string>('all');
   const [majuriActionMode, setMajuriActionMode] = useState<'measure' | 'advance'>('measure');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [costTypeFilter, setCostTypeFilter] = useState<string>('all');
+
+  // --- Live Refs for Latest State (Eliminates Stale Closure Sync Bugs) ---
+  const projectsRef = useRef(projects);
+  const majuriRef = useRef(majuriEntries);
+  const advancesRef = useRef(carpenterAdvances);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+  useEffect(() => {
+    majuriRef.current = majuriEntries;
+  }, [majuriEntries]);
+  useEffect(() => {
+    advancesRef.current = carpenterAdvances;
+  }, [carpenterAdvances]);
 
   // --- Network & Firebase Auth / Workspace State ---
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -767,8 +882,9 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<string>('demo');
-  const [sharedRoomCode] = useState<string>('HOME-2026');
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error' | 'demo'>('demo');
+  const [syncErrorMsg, setSyncErrorMsg] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // --- Modals & Drawers State ---
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState<boolean>(false);
@@ -790,7 +906,7 @@ export default function App() {
   const [formVendor, setFormVendor] = useState<string>('');
   const [formMode, setFormMode] = useState<string>('UPI');
   const [formStatus, setFormStatus] = useState<string>('Paid');
-  const [formDate, setFormDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [formDate, setFormDate] = useState<string>(() => getLocalTodayISO());
   const [formNotes, setFormNotes] = useState<string>('');
   const [formReceipt, setFormReceipt] = useState<string | null>(null);
 
@@ -833,7 +949,7 @@ export default function App() {
   const [advAmount, setAdvAmount] = useState<string>('');
   const [advMode, setAdvMode] = useState<string>('UPI');
   const [advPaidBy, setAdvPaidBy] = useState<string>('You');
-  const [advDate, setAdvDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [advDate, setAdvDate] = useState<string>(() => getLocalTodayISO());
   const [advNotes, setAdvNotes] = useState<string>('');
   const [advSyncToBills, setAdvSyncToBills] = useState<boolean>(true);
 
@@ -841,12 +957,34 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
     }, 3000);
-  };
+  }, []);
+
+  // --- Helper: Persist Backup Snapshot to localStorage ---
+  const persistLocalBackup = useCallback(
+    (
+      nextProjects: Record<string, ProjectData>,
+      nextMajuri: MajuriEntry[],
+      nextAdvances: CarpenterAdvance[]
+    ) => {
+      try {
+        const snapshot: VaultSnapshot = {
+          projects: nextProjects,
+          majuriEntries: nextMajuri,
+          carpenterAdvances: nextAdvances,
+          updatedAt: Date.now()
+        };
+        localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(snapshot));
+      } catch (err) {
+        console.warn('LocalStorage backup quota/error:', err);
+      }
+    },
+    []
+  );
 
   // --- Sync Dark Mode Class & Color-Scheme to Root <html> ---
   useEffect(() => {
@@ -880,12 +1018,12 @@ export default function App() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      showToast('Back online — cloud sync active');
+      showToast('Back online — syncing to cloud...');
     };
     const handleOffline = () => {
       setIsOnline(false);
       setSyncStatus('offline');
-      showToast('Offline mode — changes cached locally');
+      showToast('Offline mode — changes saved locally');
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -893,7 +1031,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [showToast]);
 
   // --- Firebase Authentication & Offline IndexedDB Cache Initialization ---
   useEffect(() => {
@@ -937,7 +1075,9 @@ export default function App() {
           signInWithRedirect: authMod.signInWithRedirect,
           signOut: authMod.signOut,
           doc: firestoreMod.doc,
-          setDoc: firestoreMod.setDoc
+          getDoc: firestoreMod.getDoc,
+          setDoc: firestoreMod.setDoc,
+          onSnapshot: firestoreMod.onSnapshot
         });
 
         await authMod.getRedirectResult(fbAuth).catch(() => {});
@@ -976,102 +1116,272 @@ export default function App() {
     };
   }, [isOnline]);
 
-  // --- Firebase Firestore Real-Time Private Owner Sync ---
+  // --- Helper: Resolve Primary & Legacy Firestore Document Refs ---
+  const getWorkspaceRefs = useCallback(() => {
+    if (!fbRuntime?.db || !user) return null;
+    // Primary standard path: users/{uid}/workspaces/HOME-2026
+    const primaryRef = fbRuntime.doc(fbRuntime.db, 'users', user.uid, 'workspaces', WORKSPACE_CODE);
+    // Legacy path fallback for auto-migration: artifacts/{appId}/users/{uid}/workspaces/HOME-2026
+    const legacyRef = fbRuntime.doc(
+      fbRuntime.db,
+      'artifacts',
+      appId,
+      'users',
+      user.uid,
+      'workspaces',
+      WORKSPACE_CODE
+    );
+    return { primaryRef, legacyRef };
+  }, [fbRuntime, user]);
+
+  // --- Save Data to Local Backup + Cloud Firestore (With Error Surface) ---
+  const saveProjectsToCloud = useCallback(
+    async (
+      updatedProjects: Record<string, ProjectData>,
+      updatedMajuri: MajuriEntry[] = majuriRef.current,
+      updatedAdvances: CarpenterAdvance[] = advancesRef.current,
+      showSuccessToast = false
+    ) => {
+      setProjects(updatedProjects);
+      setMajuriEntries(updatedMajuri);
+      setCarpenterAdvances(updatedAdvances);
+      persistLocalBackup(updatedProjects, updatedMajuri, updatedAdvances);
+
+      const refs = getWorkspaceRefs();
+      if (!refs || !fbRuntime?.setDoc) return;
+
+      try {
+        setSyncStatus(isOnline ? 'syncing' : 'offline');
+        setSyncErrorMsg(null);
+        await fbRuntime.setDoc(
+          refs.primaryRef,
+          {
+            projects: updatedProjects,
+            majuriEntries: updatedMajuri,
+            carpenterAdvances: updatedAdvances,
+            inviteCode: WORKSPACE_CODE,
+            ownerEmail: ALLOWED_EMAIL,
+            updatedAt: Date.now()
+          },
+          { merge: true }
+        );
+        setSyncStatus(isOnline ? 'synced' : 'offline');
+        setLastSyncedAt(
+          new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        );
+        if (showSuccessToast) {
+          showToast('Cloud sync complete!');
+        }
+      } catch (err: unknown) {
+        const message =
+          (err as { message?: string })?.message || 'Firestore write permission or network error';
+        console.error('Cloud save error:', err);
+        setSyncStatus('error');
+        setSyncErrorMsg(message);
+        showToast('Saved locally — tap Sync button to retry cloud');
+      }
+    },
+    [fbRuntime, getWorkspaceRefs, isOnline, persistLocalBackup, showToast]
+  );
+
+  // --- Initial Cloud Load + Legacy Migration + Real-Time Listener ---
   useEffect(() => {
-    if (!fbRuntime?.db || !user) return;
+    const refs = getWorkspaceRefs();
+    if (!refs || !fbRuntime?.getDoc || !fbRuntime?.onSnapshot) return;
 
     let unsubscribeSnap: (() => void) | undefined;
+    let cancelled = false;
 
     (async () => {
       try {
-        const { onSnapshot } = await import('firebase/firestore');
-        const cleanCode =
-          (sharedRoomCode || 'HOME-2026').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'HOME-2026';
-        const workspaceDocRef = fbRuntime.doc(
-          fbRuntime.db,
-          'artifacts',
-          appId,
-          'users',
-          user.uid,
-          'workspaces',
-          cleanCode
-        );
         setSyncStatus(isOnline ? 'syncing' : 'offline');
+        setSyncErrorMsg(null);
 
-        unsubscribeSnap = onSnapshot(
-          workspaceDocRef,
-          (snapshot) => {
-            if (snapshot.exists()) {
-              const data = snapshot.data();
-              if (data?.projects) setProjects(data.projects);
-              if (Array.isArray(data?.majuriEntries)) setMajuriEntries(data.majuriEntries);
-              if (Array.isArray(data?.carpenterAdvances)) setCarpenterAdvances(data.carpenterAdvances);
-              setSyncStatus(isOnline ? 'synced' : 'offline');
+        // 1. Explicitly fetch primary cloud doc first so cache misses never overwrite cloud data
+        const primarySnap = await fbRuntime.getDoc(refs.primaryRef);
+        if (cancelled) return;
+
+        if (primarySnap.exists()) {
+          const data = primarySnap.data();
+          const cloudProjects = data?.projects || INITIAL_PROJECTS;
+          const cloudMajuri: MajuriEntry[] = Array.isArray(data?.majuriEntries)
+            ? data.majuriEntries
+            : [];
+          const cloudAdvances: CarpenterAdvance[] = Array.isArray(data?.carpenterAdvances)
+            ? data.carpenterAdvances
+            : [];
+
+          // Merge any offline local entries created while disconnected
+          const localSnap = loadLocalVaultBackup();
+          const mergedExpenses = mergeById(
+            cloudProjects.interior?.expenses || [],
+            localSnap?.projects?.interior?.expenses || []
+          );
+          const mergedVendors = mergeById(
+            cloudProjects.interior?.vendors || [],
+            localSnap?.projects?.interior?.vendors || []
+          );
+          const mergedMajuri = mergeById(cloudMajuri, localSnap?.majuriEntries || []);
+          const mergedAdvances = mergeById(cloudAdvances, localSnap?.carpenterAdvances || []);
+
+          const mergedProjects: Record<string, ProjectData> = {
+            interior: {
+              ...INITIAL_PROJECTS.interior,
+              ...cloudProjects.interior,
+              expenses: mergedExpenses,
+              vendors: mergedVendors
+            }
+          };
+
+          setProjects(mergedProjects);
+          setMajuriEntries(mergedMajuri);
+          setCarpenterAdvances(mergedAdvances);
+          persistLocalBackup(mergedProjects, mergedMajuri, mergedAdvances);
+
+          // Push back up if local had unsynced offline additions
+          const hadLocalDiff =
+            mergedExpenses.length > (cloudProjects.interior?.expenses || []).length ||
+            mergedVendors.length > (cloudProjects.interior?.vendors || []).length ||
+            mergedMajuri.length > cloudMajuri.length ||
+            mergedAdvances.length > cloudAdvances.length;
+
+          if (hadLocalDiff) {
+            await fbRuntime.setDoc(
+              refs.primaryRef,
+              {
+                projects: mergedProjects,
+                majuriEntries: mergedMajuri,
+                carpenterAdvances: mergedAdvances,
+                inviteCode: WORKSPACE_CODE,
+                ownerEmail: ALLOWED_EMAIL,
+                updatedAt: Date.now()
+              },
+              { merge: true }
+            );
+          }
+
+          setSyncStatus(isOnline ? 'synced' : 'offline');
+          setLastSyncedAt(
+            new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+          );
+        } else {
+          // 2. Check legacy path (`artifacts/{appId}/users/{uid}/workspaces/HOME-2026`) and migrate automatically
+          const legacySnap = await fbRuntime.getDoc(refs.legacyRef).catch(() => null);
+          if (cancelled) return;
+
+          if (legacySnap && legacySnap.exists()) {
+            const legacyData = legacySnap.data();
+            const migratedProjects = legacyData?.projects || projectsRef.current;
+            const migratedMajuri = Array.isArray(legacyData?.majuriEntries)
+              ? legacyData.majuriEntries
+              : majuriRef.current;
+            const migratedAdvances = Array.isArray(legacyData?.carpenterAdvances)
+              ? legacyData.carpenterAdvances
+              : advancesRef.current;
+
+            await saveProjectsToCloud(migratedProjects, migratedMajuri, migratedAdvances, false);
+          } else {
+            // 3. First-time cloud initialization using current local state
+            await saveProjectsToCloud(
+              projectsRef.current,
+              majuriRef.current,
+              advancesRef.current,
+              false
+            );
+          }
+        }
+
+        // 4. Subscribe to real-time cross-device updates (including pending-writes metadata)
+        unsubscribeSnap = fbRuntime.onSnapshot(
+          refs.primaryRef,
+          { includeMetadataChanges: true },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (snapshot: any) => {
+            if (!snapshot.exists()) return;
+            const data = snapshot.data();
+            if (data?.projects) setProjects(data.projects);
+            if (Array.isArray(data?.majuriEntries)) setMajuriEntries(data.majuriEntries);
+            if (Array.isArray(data?.carpenterAdvances)) setCarpenterAdvances(data.carpenterAdvances);
+
+            if (data?.projects) {
+              persistLocalBackup(
+                data.projects,
+                Array.isArray(data?.majuriEntries) ? data.majuriEntries : [],
+                Array.isArray(data?.carpenterAdvances) ? data.carpenterAdvances : []
+              );
+            }
+
+            if (snapshot.metadata?.hasPendingWrites) {
+              setSyncStatus(isOnline ? 'syncing' : 'offline');
             } else {
-              fbRuntime
-                .setDoc(workspaceDocRef, {
-                  projects: INITIAL_PROJECTS,
-                  majuriEntries: INITIAL_MAJURI_ENTRIES,
-                  carpenterAdvances: INITIAL_CARPENTER_ADVANCES,
-                  inviteCode: cleanCode,
-                  updatedAt: Date.now()
-                })
-                .then(() => setSyncStatus(isOnline ? 'synced' : 'offline'))
-                .catch(() => setSyncStatus('demo'));
+              setSyncStatus(isOnline ? 'synced' : 'offline');
+              setLastSyncedAt(
+                new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+              );
             }
           },
-          (error) => {
-            console.warn('Firestore snapshot listener error:', error);
-            setSyncStatus('demo');
+          (error: unknown) => {
+            const msg = (error as { message?: string })?.message || 'Real-time sync listener error';
+            console.error('Firestore snapshot listener error:', error);
+            setSyncStatus('error');
+            setSyncErrorMsg(msg);
           }
         );
-      } catch (err) {
-        console.warn('Snapshot init skipped:', err);
+      } catch (err: unknown) {
+        const msg = (err as { message?: string })?.message || 'Cloud sync initialization failed';
+        console.error('Cloud sync init error:', err);
+        setSyncStatus('error');
+        setSyncErrorMsg(msg);
       }
     })();
 
     return () => {
+      cancelled = true;
       if (unsubscribeSnap) unsubscribeSnap();
     };
-  }, [fbRuntime, user, sharedRoomCode, isOnline]);
+  }, [fbRuntime, getWorkspaceRefs, isOnline, persistLocalBackup, saveProjectsToCloud]);
 
-  const saveProjectsToCloud = async (
-    updatedProjects: Record<string, ProjectData>,
-    updatedMajuri: MajuriEntry[] = majuriEntries,
-    updatedAdvances: CarpenterAdvance[] = carpenterAdvances
-  ) => {
-    setProjects(updatedProjects);
-    setMajuriEntries(updatedMajuri);
-    setCarpenterAdvances(updatedAdvances);
-    if (!fbRuntime?.db || !user) return;
+  // --- Manual Force Sync Handler (Push Local & Pull Latest Cloud) ---
+  const handleManualForceSync = async () => {
+    const refs = getWorkspaceRefs();
+    if (!refs || !fbRuntime?.getDoc) {
+      showToast('Sign in with Google to sync to cloud');
+      return;
+    }
     try {
-      setSyncStatus(isOnline ? 'syncing' : 'offline');
-      const cleanCode =
-        (sharedRoomCode || 'HOME-2026').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'HOME-2026';
-      const workspaceDocRef = fbRuntime.doc(
-        fbRuntime.db,
-        'artifacts',
-        appId,
-        'users',
-        user.uid,
-        'workspaces',
-        cleanCode
-      );
-      await fbRuntime.setDoc(
-        workspaceDocRef,
-        {
-          projects: updatedProjects,
-          majuriEntries: updatedMajuri,
-          carpenterAdvances: updatedAdvances,
-          inviteCode: cleanCode,
-          updatedAt: Date.now()
-        },
-        { merge: true }
-      );
-      setSyncStatus(isOnline ? 'synced' : 'offline');
-    } catch (err) {
-      console.warn('Cloud save error:', err);
-      setSyncStatus('offline');
+      setSyncStatus('syncing');
+      setSyncErrorMsg(null);
+      const snap = await fbRuntime.getDoc(refs.primaryRef);
+      if (snap.exists()) {
+        const cloudData = snap.data();
+        const mergedExpenses = mergeById(
+          cloudData?.projects?.interior?.expenses || [],
+          projectsRef.current.interior?.expenses || []
+        );
+        const mergedVendors = mergeById(
+          cloudData?.projects?.interior?.vendors || [],
+          projectsRef.current.interior?.vendors || []
+        );
+        const mergedMajuri = mergeById(cloudData?.majuriEntries || [], majuriRef.current);
+        const mergedAdvances = mergeById(cloudData?.carpenterAdvances || [], advancesRef.current);
+
+        const mergedProjects: Record<string, ProjectData> = {
+          interior: {
+            ...INITIAL_PROJECTS.interior,
+            ...projectsRef.current.interior,
+            expenses: mergedExpenses,
+            vendors: mergedVendors
+          }
+        };
+        await saveProjectsToCloud(mergedProjects, mergedMajuri, mergedAdvances, true);
+      } else {
+        await saveProjectsToCloud(projectsRef.current, majuriRef.current, advancesRef.current, true);
+      }
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Sync failed';
+      setSyncStatus('error');
+      setSyncErrorMsg(msg);
+      showToast(`Sync failed: ${msg}`);
     }
   };
 
@@ -1294,7 +1604,7 @@ export default function App() {
         }
         return true;
       })
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   }, [currentProject.expenses, selectedCategoryFilter, costTypeFilter, statusFilter, searchQuery]);
 
   const activeCategoryObj = useMemo(
@@ -1327,12 +1637,11 @@ export default function App() {
     setFormStatus(prefill.status || 'Paid');
     setFormDate(
       isDuplicate
-        ? new Date().toISOString().split('T')[0]
-        : prefill.date || new Date().toISOString().split('T')[0]
+        ? getLocalTodayISO()
+        : prefill.date || getLocalTodayISO()
     );
     setFormNotes(prefill.notes || '');
     setFormReceipt(prefill.receipt || null);
-    // Keep extra details smartly collapsed by default unless editing an entry that already has them
     setShowMoreBillFields(
       Boolean(
         prefill.vendor ||
@@ -1449,7 +1758,7 @@ export default function App() {
       milestones:
         quotedNum > 0
           ? [
-              { id: `ms_${Date.now()}_1`, label: '30% Advance', amount: Math.round(quotedNum * 0.3), dueDate: new Date().toISOString().split('T')[0], status: 'Due Soon' },
+              { id: `ms_${Date.now()}_1`, label: '30% Advance', amount: Math.round(quotedNum * 0.3), dueDate: getLocalTodayISO(), status: 'Due Soon' },
               { id: `ms_${Date.now()}_2`, label: '50% Work Stage', amount: Math.round(quotedNum * 0.5), dueDate: '2026-12-05', status: 'Upcoming' },
               { id: `ms_${Date.now()}_3`, label: '20% Handover', amount: Math.round(quotedNum * 0.2), dueDate: '2026-12-20', status: 'Upcoming' }
             ]
@@ -1495,7 +1804,7 @@ export default function App() {
       vendor: vendor.name,
       mode: 'UPI',
       status: 'Paid',
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalTodayISO(),
       notes: `Milestone paid (${milestone.label})`
     };
 
@@ -1660,7 +1969,7 @@ export default function App() {
       sqft: liveMajuriCalc.sqft,
       rate: parseFloat(mjRate),
       amount: liveMajuriCalc.amount,
-      date: new Date().toISOString().split('T')[0]
+      date: getLocalTodayISO()
     };
 
     let updatedProjects = projects;
@@ -1715,7 +2024,7 @@ export default function App() {
     const repeated: MajuriEntry = {
       ...entry,
       id: `mj_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0]
+      date: getLocalTodayISO()
     };
     const updatedMajuri = [repeated, ...majuriEntries];
     saveProjectsToCloud(projects, updatedMajuri, carpenterAdvances);
@@ -1860,12 +2169,6 @@ export default function App() {
 
   // --- Graphical Print-Ready PDF Report Generator ---
   const handlePrintGraphicalPDF = () => {
-    const reportWindow = window.open('', '_blank', 'width=900,height=1100');
-    if (!reportWindow) {
-      showToast('Pop-up blocked — allow pop-ups to save PDF');
-      return;
-    }
-
     const generatedOn = new Date().toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -1877,7 +2180,7 @@ export default function App() {
         ? 'All Carpenters & Vendors'
         : selectedMajuriVendorFilter;
 
-    reportWindow.document.write(`
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -1887,56 +2190,39 @@ export default function App() {
             * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
             body { margin: 0; padding: 28px; color: #0f172a; background: #ffffff; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; padding: 24px 28px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
-            .header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.4px; }
+            .header h1 { margin: 0; font-size: 24px; font-weight: 800; }
             .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
             .badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; }
             .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
             .kpi { border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px; background: #f8fafc; }
             .kpi-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; }
-            .kpi-val { font-size: 20px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+            .kpi-val { font-size: 20px; font-weight: 800; margin-top: 4px; }
             .section { border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; margin-bottom: 18px; page-break-inside: avoid; }
             .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #4f46e5; margin: 0 0 14px; }
-            .bar-row { margin-bottom: 12px; }
+            .bar-row { margin-bottom: 10px; }
             .bar-meta { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
             .bar-track { width: 100%; height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
             .bar-fill { height: 100%; border-radius: 999px; }
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
             th { text-align: left; padding: 10px 8px; background: #f1f5f9; color: #475569; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
             td { padding: 9px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-            .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
-            .paid { background: #dcfce7; color: #166534; }
-            .advance { background: #fef3c7; color: #92400e; }
-            .pending { background: #ffe4e6; color: #9f1239; }
-            .footer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 24px; }
             @media print { body { padding: 12px; } }
           </style>
         </head>
         <body>
           <div class="header">
             <div>
-              <h1>HomeLedger • Interior & Appliances Statement</h1>
-              <p>Trade-Wise Renovation, Majuri Khata & Appliance Purchases</p>
+              <h1>HomeLedger • Interior Work & Majuri</h1>
+              <p>Graphical Renovation Statement • Workspace: ${WORKSPACE_CODE}</p>
             </div>
             <div class="badge">Generated ${generatedOn}</div>
           </div>
 
           <div class="kpi-grid">
-            <div class="kpi">
-              <div class="kpi-label">Total Actual Spent</div>
-              <div class="kpi-val" style="color:#4f46e5;">${formatINR(analytics.totalSpent)}</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Settled / Paid</div>
-              <div class="kpi-val" style="color:#059669;">${formatINR(analytics.paidAmount)}</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Advance Given</div>
-              <div class="kpi-val" style="color:#d97706;">${formatINR(analytics.advanceAmount)}</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Pending & Vendor Dues</div>
-              <div class="kpi-val" style="color:#e11d48;">${formatINR(analytics.totalVendorDues)}</div>
-            </div>
+            <div class="kpi"><div class="kpi-label">Total Spent</div><div class="kpi-val" style="color:#4f46e5;">${formatINR(analytics.totalSpent)}</div></div>
+            <div class="kpi"><div class="kpi-label">Paid</div><div class="kpi-val" style="color:#059669;">${formatINR(analytics.paidAmount)}</div></div>
+            <div class="kpi"><div class="kpi-label">Advance Given</div><div class="kpi-val" style="color:#d97706;">${formatINR(analytics.advanceAmount)}</div></div>
+            <div class="kpi"><div class="kpi-label">Pending & Dues</div><div class="kpi-val" style="color:#e11d48;">${formatINR(analytics.totalVendorDues)}</div></div>
           </div>
 
           <div class="section">
@@ -1945,13 +2231,8 @@ export default function App() {
               .map(
                 (cat) => `
                   <div class="bar-row">
-                    <div class="bar-meta">
-                      <span>${cat.label} (${cat.count} bills)</span>
-                      <span>${formatINR(cat.spent)} (${cat.sharePct}%)</span>
-                    </div>
-                    <div class="bar-track">
-                      <div class="bar-fill" style="width:${cat.sharePct}%; background:${cat.color};"></div>
-                    </div>
+                    <div class="bar-meta"><span>${cat.label}</span><span>${formatINR(cat.spent)} (${cat.sharePct}%)</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${cat.sharePct}%; background:${cat.color};"></div></div>
                   </div>
                 `
               )
@@ -1959,167 +2240,111 @@ export default function App() {
           </div>
 
           <div class="section" style="border-color:#fed7aa; background:#fffaf5;">
-            <h3 class="section-title" style="color:#ea580c;">Carpentry Majuri & Advance Khata (${scopeTitle})</h3>
-            <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:14px;">
-              <div class="kpi" style="background:#ffffff;">
-                <div class="kpi-label">Total Measured Area</div>
-                <div class="kpi-val" style="font-size:17px; color:#ea580c;">${majuriSummary.totalSqft} sq.ft.</div>
-              </div>
-              <div class="kpi" style="background:#ffffff;">
-                <div class="kpi-label">Total Work Bill</div>
-                <div class="kpi-val" style="font-size:17px; color:#4f46e5;">${formatINR(majuriSummary.totalWorkBill)}</div>
-              </div>
-              <div class="kpi" style="background:#ffffff;">
-                <div class="kpi-label">Advances Paid (No Meas.)</div>
-                <div class="kpi-val" style="font-size:17px; color:#059669;">${formatINR(majuriSummary.totalAdvancePaid)}</div>
-              </div>
-              <div class="kpi" style="background:#ffffff;">
-                <div class="kpi-label">${majuriSummary.netBalance >= 0 ? 'Net Balance Payable' : 'Extra Advance Credit'}</div>
-                <div class="kpi-val" style="font-size:17px; color:${majuriSummary.netBalance >= 0 ? '#e11d48' : '#d97706'};">${formatINR(Math.abs(majuriSummary.netBalance))}</div>
-              </div>
+            <h3 class="section-title" style="color:#ea580c;">Carpentry Majuri Khata (${scopeTitle})</h3>
+            <div class="kpi-grid">
+              <div class="kpi" style="background:#fff;"><div class="kpi-label">Measured Area</div><div class="kpi-val" style="font-size:17px; color:#ea580c;">${majuriSummary.totalSqft} ft²</div></div>
+              <div class="kpi" style="background:#fff;"><div class="kpi-label">Work Bill</div><div class="kpi-val" style="font-size:17px; color:#4f46e5;">${formatINR(majuriSummary.totalWorkBill)}</div></div>
+              <div class="kpi" style="background:#fff;"><div class="kpi-label">Advances Paid</div><div class="kpi-val" style="font-size:17px; color:#059669;">${formatINR(majuriSummary.totalAdvancePaid)}</div></div>
+              <div class="kpi" style="background:#fff;"><div class="kpi-label">${majuriSummary.netBalance >= 0 ? 'Net Payable' : 'Advance Credit'}</div><div class="kpi-val" style="font-size:17px; color:${majuriSummary.netBalance >= 0 ? '#e11d48' : '#d97706'};">${formatINR(Math.abs(majuriSummary.netBalance))}</div></div>
             </div>
 
-            <table style="margin-bottom:14px; background:#ffffff;">
+            <table style="margin-bottom:14px; background:#fff;">
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Vendor / Carpenter</th>
-                  <th>Room / Area</th>
-                  <th>Work Description</th>
-                  <th>Dimensions</th>
-                  <th>Area (Sq.Ft)</th>
-                  <th>Rate</th>
-                  <th style="text-align:right;">Majuri Bill</th>
-                </tr>
+                <tr><th>Date</th><th>Vendor / Carpenter</th><th>Room</th><th>Work Description</th><th>Dimensions</th><th>Sq.Ft</th><th>Rate</th><th style="text-align:right;">Bill</th></tr>
               </thead>
               <tbody>
                 ${filteredMajuriEntries
                   .map((m) => {
                     const rLabel = MAJURI_ROOMS.find((r) => r.id === m.roomId)?.label || m.roomId;
-                    const qPrefix = (m.qty || 1) > 1 ? `${m.qty} × ` : '';
-                    return `
-                      <tr>
-                        <td>${m.date}</td>
-                        <td><strong>${m.vendorName || DEFAULT_CARPENTER_VENDOR}</strong></td>
-                        <td>${rLabel}</td>
-                        <td>${m.item}</td>
-                        <td>${qPrefix}${m.height}${m.unit} × ${m.width}${m.unit}</td>
-                        <td>${m.sqft} ft²</td>
-                        <td>₹${m.rate}/ft²</td>
-                        <td style="text-align:right; font-weight:800;">${formatINR(m.amount)}</td>
-                      </tr>
-                    `;
+                    const qLabel = m.qty && m.qty > 1 ? `${m.qty}× ` : '';
+                    return `<tr><td>${m.date}</td><td><strong>${m.vendorName || DEFAULT_CARPENTER_VENDOR}</strong></td><td>${rLabel}</td><td>${m.item}</td><td>${qLabel}${m.height}${m.unit} × ${m.width}${m.unit}</td><td>${m.sqft}</td><td>₹${m.rate}</td><td style="text-align:right; font-weight:800;">${formatINR(m.amount)}</td></tr>`;
                   })
                   .join('')}
-                <tr style="background:#fff7ed;">
-                  <td colspan="5" style="font-weight:800; color:#9a3412;">TOTAL MEASURED CARPENTRY WORK BILL</td>
-                  <td style="font-weight:800; color:#9a3412;">${majuriSummary.totalSqft} ft²</td>
-                  <td>—</td>
-                  <td style="text-align:right; font-weight:900; color:#ea580c;">${formatINR(majuriSummary.totalWorkBill)}</td>
-                </tr>
               </tbody>
             </table>
 
-            <table style="background:#ffffff;">
+            <table style="background:#fff;">
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Vendor / Carpenter</th>
-                  <th>Advance Payment (No Meas.)</th>
-                  <th>Paid By</th>
-                  <th>Mode</th>
-                  <th>Notes</th>
-                  <th style="text-align:right;">Advance Paid</th>
-                </tr>
+                <tr><th>Date</th><th>Vendor / Carpenter</th><th>Advance Payment (No Measurement)</th><th>Mode</th><th>Notes</th><th style="text-align:right;">Paid</th></tr>
               </thead>
               <tbody>
                 ${filteredCarpenterAdvances
                   .map(
-                    (a) => `
-                    <tr>
-                      <td>${a.date}</td>
-                      <td><strong>${a.vendorName || DEFAULT_CARPENTER_VENDOR}</strong></td>
-                      <td>${a.weekLabel}</td>
-                      <td>${a.paidBy}</td>
-                      <td>${a.mode}</td>
-                      <td>${a.notes || '—'}</td>
-                      <td style="text-align:right; font-weight:800; color:#059669;">${formatINR(a.amount)}</td>
-                    </tr>
-                  `
+                    (a) =>
+                      `<tr><td>${a.date}</td><td><strong>${a.vendorName || DEFAULT_CARPENTER_VENDOR}</strong></td><td>${a.weekLabel}</td><td>${a.mode}</td><td>${a.notes || '—'}</td><td style="text-align:right; font-weight:800; color:#059669;">${formatINR(a.amount)}</td></tr>`
                   )
                   .join('')}
-                <tr style="background:#ecfdf5;">
-                  <td colspan="6" style="font-weight:800; color:#065f46;">TOTAL ADVANCES PAID WITHOUT MEASUREMENT (${filteredCarpenterAdvances.length} ENTRIES)</td>
-                  <td style="text-align:right; font-weight:900; color:#059669;">${formatINR(majuriSummary.totalAdvancePaid)}</td>
-                </tr>
-                <tr style="background:${majuriSummary.netBalance >= 0 ? '#fff1f2' : '#fef3c7'};">
-                  <td colspan="6" style="font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#9f1239' : '#92400e'};">
-                    ${majuriSummary.netBalance >= 0 ? 'NET BALANCE PAYABLE (WORK BILL − ADVANCES)' : 'EXTRA ADVANCE CREDIT HELD BY CONTRACTOR'}
-                  </td>
-                  <td style="text-align:right; font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#e11d48' : '#d97706'};">
-                    ${formatINR(Math.abs(majuriSummary.netBalance))}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
 
           <div class="section">
-            <h3 class="section-title">Itemized Interior & Appliances Ledger (${(currentProject.expenses || []).length} Entries)</h3>
+            <h3 class="section-title">Itemized Interior & Appliance Bills (${(currentProject.expenses || []).length})</h3>
             <table>
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Description</th>
-                  <th>Section</th>
-                  <th>Type</th>
-                  <th>Store / Vendor</th>
-                  <th>Payment Plan &amp; Warranty</th>
-                  <th>Mode</th>
-                  <th>Status</th>
-                  <th style="text-align:right;">Amount</th>
-                </tr>
+                <tr><th>Date</th><th>Description</th><th>Section</th><th>Type</th><th>Store / Vendor</th><th>Plan / Warranty</th><th>Status</th><th style="text-align:right;">Amount</th></tr>
               </thead>
               <tbody>
                 ${(currentProject.expenses || [])
                   .map((e) => {
                     const catLabel = findCategoryById(e.category).shortLabel;
-                    const stClass = e.status === 'Paid' ? 'paid' : e.status === 'Advance' ? 'advance' : 'pending';
                     const planStr =
-                      e.paymentPlan === 'EMI'
-                        ? `EMI${e.emiDetails ? ` (${e.emiDetails})` : ''}`
-                        : 'Full';
-                    const warStr = e.warrantyPeriod && e.warrantyPeriod !== 'No Warranty' ? ` • ${e.warrantyPeriod} Warranty` : '';
-                    return `
-                      <tr>
-                        <td>${e.date}</td>
-                        <td><strong>${e.title}</strong></td>
-                        <td>${catLabel}</td>
-                        <td>${e.costType || 'Material'}</td>
-                        <td>${e.vendor}</td>
-                        <td>${planStr}${warStr}</td>
-                        <td>${e.mode}</td>
-                        <td><span class="pill ${stClass}">${e.status}</span></td>
-                        <td style="text-align:right; font-weight:800;">${formatINR(e.amount)}</td>
-                      </tr>
-                    `;
+                      e.category === 'appliances'
+                        ? [
+                            e.paymentPlan === 'EMI'
+                              ? `EMI${e.emiDetails ? ` (${e.emiDetails})` : ''}`
+                              : 'Full',
+                            e.warrantyPeriod && e.warrantyPeriod !== 'No Warranty'
+                              ? `${e.warrantyPeriod} Warranty`
+                              : ''
+                          ]
+                            .filter(Boolean)
+                            .join(' • ')
+                        : e.mode;
+                    return `<tr><td>${e.date}</td><td><strong>${e.title}</strong></td><td>${catLabel}</td><td>${e.costType || 'Material'}</td><td>${e.vendor}</td><td>${planStr}</td><td>${e.status}</td><td style="text-align:right; font-weight:800;">${formatINR(e.amount)}</td></tr>`;
                   })
                   .join('')}
               </tbody>
             </table>
           </div>
-
-          <div class="footer">Generated via HomeLedger • Interior & Majuri Expense Manager</div>
-          <script>
-            window.onload = function() {
-              setTimeout(function() { window.print(); }, 300);
-            };
-          </script>
+          <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };</script>
         </body>
       </html>
-    `);
-    reportWindow.document.close();
-    showToast('Opening print-ready Graphical PDF...');
+    `;
+
+    const reportWindow = window.open('', '_blank', 'width=900,height=1100');
+    if (reportWindow) {
+      reportWindow.document.write(htmlContent);
+      reportWindow.document.close();
+      showToast('Opening print-ready Graphical PDF...');
+      return;
+    }
+
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(htmlContent);
+      frameDoc.close();
+      setTimeout(() => {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1500);
+      }, 350);
+      showToast('Opening Print / Save as PDF...');
+    } else {
+      showToast('Please allow pop-ups to save PDF');
+    }
   };
 
   // --- 1-Click CSV / Excel Report Export ---
@@ -2165,7 +2390,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `HomeLedger_Interiors_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `HomeLedger_Interiors_${getLocalTodayISO()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2179,108 +2404,83 @@ export default function App() {
   if (showLoginGate) {
     return (
       <div className={darkMode ? 'dark' : ''}>
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200">
-          <div className="w-full max-w-md min-h-screen bg-white dark:bg-slate-900 shadow-2xl sm:border-x border-slate-200/80 dark:border-slate-800 flex flex-col justify-between p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
-                  <HomeIcon className="w-5 h-5" />
-                </div>
-                <span className="text-base font-black tracking-tight">HomeLedger</span>
-              </div>
+        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center">
+          <div className="w-full max-w-md min-h-screen bg-white dark:bg-slate-900 shadow-2xl sm:border-x border-slate-200 dark:border-slate-800 flex flex-col justify-between p-6">
+            <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={() => setDarkMode((prev) => !prev)}
                 aria-label="Toggle color theme"
-                className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-95 transition-transform touch-manipulation"
+                className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center touch-manipulation active:scale-95 transition-transform"
               >
-                {darkMode ? <SunIcon className="w-4 h-4 text-amber-400" /> : <MoonIcon className="w-4 h-4" />}
+                {darkMode ? <SunIcon className="w-5 h-5 text-amber-400" /> : <MoonIcon className="w-5 h-5" />}
               </button>
             </div>
 
-            <div className="my-auto py-8 space-y-6 text-center">
-              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30">
+            <div className="space-y-6 text-center my-auto">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30 mx-auto">
                 <HomeIcon className="w-10 h-10" />
               </div>
 
               <div className="space-y-2">
-                <span className="inline-block px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[11px] font-extrabold uppercase tracking-wider">
-                  Owner-Locked Vault
+                <span className="inline-block px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-extrabold uppercase tracking-wider">
+                  Private Owner Vault
                 </span>
-                <h1 className="text-2xl font-black tracking-tight">
-                  Interior &amp; Majuri Ledger
-                </h1>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                  Sign in with your authorized Google account to access your private home interior bills &amp; carpentry khata.
+                <h1 className="text-3xl font-black tracking-tight">HomeLedger</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+                  Interior Trades, Appliances Shopping &amp; Carpentry Majuri Khata.
                 </p>
               </div>
 
               {isInAppWebView && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-xs font-bold text-amber-800 dark:text-amber-200 text-left space-y-2">
-                  <p>
-                    You opened this link inside an in-app browser (WhatsApp/Instagram). Google blocks sign-in inside in-app browsers—open in <strong>Chrome</strong> or <strong>Safari</strong> first.
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-left space-y-2">
+                  <div className="text-xs font-black text-amber-700 dark:text-amber-300">
+                    In-App Browser Detected (WhatsApp / Instagram)
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Google Sign-In is blocked inside embedded apps. Tap below to copy the link and open it in <strong>Chrome</strong> or <strong>Safari</strong>.
                   </p>
                   <button
                     type="button"
                     onClick={() => {
                       navigator.clipboard?.writeText(window.location.href).catch(() => {});
-                      showToast('Link copied — paste in Chrome or Safari');
+                      showToast('Link copied! Paste in Chrome or Safari');
                     }}
-                    className="h-9 px-3 rounded-xl bg-amber-600 text-white text-[11px] font-extrabold"
+                    className="h-9 px-3 rounded-xl bg-amber-600 text-white text-xs font-extrabold"
                   >
-                    Copy Link for Chrome / Safari
+                    Copy App Link
                   </button>
                 </div>
               )}
 
-              {authError && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs font-extrabold text-rose-600 dark:text-rose-400 text-left">
-                  {authError}
+              <div className="p-4 rounded-3xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Authorized Owner Account
                 </div>
-              )}
+                <div className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                  {ALLOWED_EMAIL}
+                </div>
 
-              <div className="space-y-3 pt-2">
+                {authError && (
+                  <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs font-extrabold text-rose-600 dark:text-rose-400">
+                    {authError}
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
-                  className="w-full h-14 px-5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-95 active:scale-[0.98] font-extrabold text-sm flex items-center justify-center gap-3 shadow-xl transition-all touch-manipulation"
+                  className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-black text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-indigo-600/30 transition-all"
                 >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
-                    />
-                  </svg>
+                  <LogInIcon className="w-5 h-5" />
                   <span>Continue with Google</span>
                 </button>
-
-                {!hasFirebaseConfig && (
-                  <button
-                    type="button"
-                    onClick={() => setDemoBypass(true)}
-                    className="w-full h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-extrabold touch-manipulation"
-                  >
-                    Open Local Preview (No Firebase Config)
-                  </button>
-                )}
               </div>
             </div>
 
-            <div className="text-center text-[11px] font-semibold text-slate-400">
-              Restricted to <span className="font-bold text-slate-600 dark:text-slate-300">{ALLOWED_EMAIL}</span>
-            </div>
+            <p className="text-[11px] text-center text-slate-400 font-semibold">
+              Protected by Firebase Authentication • Single Gmail Lock
+            </p>
           </div>
         </div>
       </div>
@@ -2299,8 +2499,8 @@ export default function App() {
             </div>
           )}
 
-          {/* ================= CLEAN MOBILE HEADER ================= */}
-          <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/70 dark:border-slate-800 px-4 pt-3.5 pb-3">
+          {/* ================= STREAMLINED MOBILE HEADER WITH LIVE SYNC STATUS ================= */}
+          <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/70 dark:border-slate-800 px-4 pt-3 pb-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 shrink-0">
@@ -2308,44 +2508,61 @@ export default function App() {
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-base font-black tracking-tight leading-none truncate">HomeLedger</h1>
-                  <div className="flex items-center gap-1.5 mt-1">
+                  <button
+                    type="button"
+                    onClick={handleManualForceSync}
+                    title="Tap to force cloud sync now"
+                    className="flex items-center gap-1 mt-1 text-left"
+                  >
                     {!isOnline || syncStatus === 'offline' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                        <CloudOffIcon className="w-3 h-3" /> Offline Cached
+                        <CloudOffIcon className="w-3 h-3" /> Offline Saved
+                      </span>
+                    ) : syncStatus === 'error' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                        <RefreshIcon className="w-3 h-3" /> Sync Error • Tap Retry
+                      </span>
+                    ) : syncStatus === 'syncing' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                        <RefreshIcon className="w-3 h-3 animate-spin" /> Syncing Cloud...
                       </span>
                     ) : syncStatus === 'synced' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <CloudIcon className="w-3 h-3" /> Synced
+                        <CloudIcon className="w-3 h-3" /> Synced {lastSyncedAt ? `(${lastSyncedAt})` : ''}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> Interior Vault
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> Local Vault
                       </span>
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
 
-              {/* Action Controls: Report, A+ Font Toggle, Dark Theme, Sign Out */}
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="h-10 px-3 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 flex items-center gap-1.5 text-xs font-extrabold active:scale-95 transition-all touch-manipulation"
+                  onClick={handleManualForceSync}
+                  aria-label="Sync Cloud Now"
+                  title="Sync Cloud Now"
+                  className={`w-10 h-10 rounded-2xl border flex items-center justify-center active:scale-95 transition-transform ${
+                    syncStatus === 'error'
+                      ? 'bg-rose-500/15 text-rose-600 border-rose-500/30'
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                  }`}
                 >
-                  <PrinterIcon className="w-3.5 h-3.5" />
-                  <span>Report</span>
+                  <RefreshIcon className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setLargeTextMode(!largeTextMode)}
-                  title="Toggle Large Text (A+)"
-                  aria-label="Toggle large text"
-                  className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black active:scale-95 transition-all touch-manipulation ${
+                  onClick={() => setLargeTextMode((prev) => !prev)}
+                  aria-label="Toggle large readable text"
+                  title="Larger Text (A+)"
+                  className={`h-10 px-2.5 rounded-2xl border text-xs font-black transition-all touch-manipulation ${
                     largeTextMode
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-transparent'
                   }`}
                 >
                   A+
@@ -2353,45 +2570,61 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setDarkMode(!darkMode)}
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="h-10 px-2.5 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 flex items-center gap-1 text-xs font-extrabold active:scale-95 transition-transform"
+                >
+                  <PrinterIcon className="w-3.5 h-3.5" />
+                  <span>PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDarkMode((prev) => !prev)}
                   aria-label="Toggle color theme"
-                  className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-95 transition-transform touch-manipulation"
+                  className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 touch-manipulation active:scale-95 transition-transform"
                 >
                   {darkMode ? <SunIcon className="w-4 h-4 text-amber-400" /> : <MoonIcon className="w-4 h-4" />}
                 </button>
 
-                {user ? (
+                {user && (
                   <button
                     type="button"
                     onClick={handleSignOut}
                     title={`Signed in as ${user.email || ALLOWED_EMAIL}`}
-                    className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center active:scale-95 transition-transform touch-manipulation"
+                    className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center active:scale-95 transition-transform"
                   >
                     <LogOutIcon className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    title={`Sign in with ${ALLOWED_EMAIL}`}
-                    className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center active:scale-95 transition-transform touch-manipulation"
-                  >
-                    <LogInIcon className="w-4 h-4" />
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Explicit Sync Error Diagnostics Banner (Only Appears if Firestore Rules Block Writes) */}
+            {syncStatus === 'error' && syncErrorMsg && (
+              <div className="mt-2.5 p-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-between gap-2">
+                <div className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-snug">
+                  Cloud sync blocked: {syncErrorMsg}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleManualForceSync}
+                  className="h-8 px-2.5 rounded-xl bg-rose-600 text-white text-[11px] font-extrabold shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </header>
 
           {/* ================= MAIN SCROLLABLE CONTENT AREA ================= */}
           <main className="flex-1 px-4 pt-4 space-y-4">
-            {/* TAB 1: GRAPHICAL OVERVIEW */}
+            {/* TAB 1: GRAPHICAL HOME OVERVIEW */}
             {activeTab === 'overview' && (
               <section className="space-y-4">
                 {showInstallTip && (
-                  <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-bold text-indigo-800 dark:text-indigo-200 leading-snug">
-                      Tip: Tap your browser menu → <strong>Add to Home Screen</strong> to use HomeLedger like a phone app.
+                  <div className="px-3.5 py-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 leading-snug">
+                      Tip: Tap browser menu <strong>⋮</strong> &rarr; <strong>Add to Home Screen</strong> to use like an app.
                     </p>
                     <button
                       type="button"
@@ -2403,117 +2636,131 @@ export default function App() {
                           // Ignore
                         }
                       }}
-                      className="p-1.5 rounded-xl text-indigo-600 dark:text-indigo-300 shrink-0"
+                      className="text-xs font-black text-indigo-500 px-2 py-1"
                     >
-                      <XIcon className="w-4 h-4" />
+                      ✕
                     </button>
                   </div>
                 )}
 
-                {/* Hero Spend Ring Card */}
+                {/* Hero Total Actual Spent Card */}
                 <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                        Total Interior &amp; Appliance Spend
+                        Total Interior &amp; Shopping Spent
                       </span>
                       <h2 className="text-3xl font-black tracking-tight mt-0.5">
                         {formatINR(analytics.totalSpent)}
                       </h2>
                     </div>
-                    <span className="px-3 py-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 text-xs font-extrabold text-slate-600 dark:text-slate-300">
-                      {analytics.billCount} Bills
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openAddExpenseDrawer()}
+                      className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm active:scale-95 transition-transform"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      <span>Add Bill</span>
+                    </button>
                   </div>
 
-                  {/* Donut Ring + 3 Clear Status Pills */}
-                  <div className="flex items-center gap-4">
-                    <div className="relative flex items-center justify-center shrink-0">
-                      <NativeDonutChart data={analytics.categoryDonutData} size={132} strokeWidth={18} />
+                  {/* Donut Ring + 3 Clean Status Pills */}
+                  <div className="grid grid-cols-2 items-center gap-3">
+                    <div className="h-36 relative flex items-center justify-center">
+                      <NativeDonutChart data={analytics.categoryDonutData} size={140} strokeWidth={20} />
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-[10px] font-bold text-slate-400">Paid</span>
-                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                          {analytics.totalSpent > 0
-                            ? `${Math.round(((analytics.paidAmount + analytics.advanceAmount) / analytics.totalSpent) * 100)}%`
-                            : '0%'}
-                        </span>
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Bills</span>
+                        <span className="text-lg font-black">{analytics.billCount}</span>
                       </div>
                     </div>
 
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-emerald-500/10">
-                        <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">Paid</span>
+                    <div className="space-y-2">
+                      <div className="px-3 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400">Paid</span>
                         <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
                           {formatINR(analytics.paidAmount, true)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-500/10">
-                        <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">Advance</span>
+                      <div className="px-3 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-400">Advance</span>
                         <span className="text-sm font-black text-amber-700 dark:text-amber-300">
                           {formatINR(analytics.advanceAmount, true)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-rose-500/10">
-                        <span className="text-xs font-extrabold text-rose-700 dark:text-rose-300">Pending</span>
+                      <div className="px-3 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-rose-700 dark:text-rose-400">Dues</span>
                         <span className="text-sm font-black text-rose-700 dark:text-rose-300">
                           {formatINR(analytics.totalVendorDues, true)}
                         </span>
                       </div>
                     </div>
                   </div>
+
+                  {/* Material vs Majuri vs Turnkey Visual Bar */}
+                  {analytics.totalSpent > 0 && (
+                    <div className="pt-1 space-y-1.5">
+                      <div className="flex justify-between text-[10px] font-extrabold text-slate-400">
+                        <span>Material {analytics.materialPct}%</span>
+                        <span>Majuri {analytics.labourPct}%</span>
+                        <span>With-Mat / Lump {analytics.turnkeyPct}%</span>
+                      </div>
+                      <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
+                        <div className="h-full bg-indigo-600" style={{ width: `${analytics.materialPct}%` }} />
+                        <div className="h-full bg-orange-500" style={{ width: `${analytics.labourPct}%` }} />
+                        <div className="h-full bg-emerald-500" style={{ width: `${analytics.turnkeyPct}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Quick-Start Onboarding Card when Empty */}
+                {/* Quick-Start Empty State Onboarding Card */}
                 {analytics.billCount === 0 && majuriEntries.length === 0 && (
-                  <div className="p-4 rounded-3xl bg-white dark:bg-slate-800/90 border border-dashed border-indigo-400/60 space-y-3">
-                    <div className="text-xs font-black text-indigo-600 dark:text-indigo-400">
-                      Quick Start — Tap a Trade or Log Your First Entry
+                  <div className="bg-indigo-600/10 border border-indigo-500/25 rounded-3xl p-4 space-y-3">
+                    <div className="text-xs font-black text-indigo-700 dark:text-indigo-300">
+                      Clean Slate Ready (₹0) — Start in 1 Tap:
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => openAddExpenseDrawer({ category: 'false_ceiling' })}
-                        className="h-11 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5"
+                        onClick={() => openAddExpenseDrawer()}
+                        className="h-12 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
                       >
                         <PlusIcon className="w-4 h-4" />
-                        <span>Add Trade Bill</span>
+                        <span>Add First Bill</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setActiveTab('majuri')}
-                        className="h-11 px-3 rounded-2xl bg-orange-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5"
+                        className="h-12 px-3 rounded-2xl bg-orange-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
                       >
                         <RulerIcon className="w-4 h-4" />
-                        <span>Carpenter Majuri</span>
+                        <span>Log Carpenter</span>
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Carpenter Majuri Shortcut Card */}
+                {/* Carpentry Majuri Shortcut Banner */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('majuri')}
-                  className="w-full text-left bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-3xl p-4 shadow-md shadow-orange-600/20 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+                  className="w-full text-left bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-3xl p-4 shadow-md shadow-orange-500/20 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-orange-100">
-                      <RulerIcon className="w-3.5 h-3.5" />
-                      <span>Main Carpenter &amp; Vendors Majuri</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                      <RulerIcon className="w-6 h-6" />
                     </div>
-                    <div className="text-base font-black">
-                      {majuriSummary.totalSqft} ft² • Bill {formatINR(majuriSummary.totalWorkBill, true)}
-                    </div>
-                    <div className="text-xs font-bold text-orange-100">
-                      Advances Paid: {formatINR(majuriSummary.totalAdvancePaid, true)}
+                    <div className="min-w-0">
+                      <div className="text-sm font-black">Carpentry Majuri Khata</div>
+                      <div className="text-xs font-semibold text-orange-100 truncate">
+                        {majuriSummary.totalSqft} ft² • Work {formatINR(majuriSummary.totalWorkBill, true)} • Adv {formatINR(majuriSummary.totalAdvancePaid, true)}
+                      </div>
                     </div>
                   </div>
-                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                    <ArrowUpRightIcon className="w-5 h-5" />
-                  </div>
+                  <ArrowUpRightIcon className="w-5 h-5 shrink-0" />
                 </button>
 
-                {/* Trade & Shopping Sections Grid (Tap any section to view or add) */}
+                {/* Trade & Shopping Sections Grid */}
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
@@ -2527,19 +2774,19 @@ export default function App() {
                       const CIcon = cat.icon;
                       return (
                         <button
-                          type="button"
                           key={cat.id}
+                          type="button"
                           onClick={() => {
                             setSelectedCategoryFilter(cat.id);
                             setActiveTab('expenses');
                           }}
-                          className="text-left bg-white dark:bg-slate-800/90 p-3.5 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm active:scale-[0.98] transition-transform space-y-2"
+                          className="text-left bg-white dark:bg-slate-800/90 p-3.5 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm active:scale-[0.98] transition-all space-y-2.5"
                         >
                           <div className="flex items-center justify-between">
-                            <div className={`w-9 h-9 rounded-2xl ${cat.bg} ${cat.text} flex items-center justify-center`}>
-                              <CIcon className="w-4 h-4" />
+                            <div className={`w-10 h-10 rounded-2xl ${cat.bg} ${cat.text} flex items-center justify-center`}>
+                              <CIcon className="w-5 h-5" />
                             </div>
-                            <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
+                            <span className="text-xs font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
                               {cat.sharePct}%
                             </span>
                           </div>
@@ -2550,9 +2797,9 @@ export default function App() {
                               {cat.subtitle}
                             </div>
                           </div>
-                          <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                             <div
-                              className="h-full rounded-full"
+                              className="h-full rounded-full transition-all duration-500"
                               style={{ width: `${cat.sharePct}%`, backgroundColor: cat.color }}
                             />
                           </div>
@@ -2564,13 +2811,13 @@ export default function App() {
               </section>
             )}
 
-            {/* TAB 2: BILLS LEDGER (WITH DEDICATED SECTION HEADER & QUICK PRESETS) */}
+            {/* TAB 2: EXPENSE BILL LEDGER */}
             {activeTab === 'expenses' && (
               <section className="space-y-3.5">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h2 className="text-lg font-black">
-                      {selectedFilterCategoryObj ? selectedFilterCategoryObj.label : 'All Interior Bills'} ({filteredExpenses.length})
+                      {selectedFilterCategoryObj ? selectedFilterCategoryObj.label : `All Bills (${filteredExpenses.length})`}
                     </h2>
                     {selectedFilterCategoryObj && (
                       <p className="text-[11px] font-semibold text-slate-400">
@@ -2580,34 +2827,27 @@ export default function App() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleExportCSV}
-                    className="h-9 px-3 rounded-xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1 shrink-0"
+                    onClick={() => openAddExpenseDrawer()}
+                    className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1 shrink-0"
                   >
-                    <SpreadsheetIcon className="w-3.5 h-3.5" />
-                    <span>CSV</span>
+                    <PlusIcon className="w-4 h-4" />
+                    <span>{selectedFilterCategoryObj ? `Add ${selectedFilterCategoryObj.shortLabel}` : 'Add Bill'}</span>
                   </button>
                 </div>
 
-                {/* Section-Specific 1-Tap Quick Add Chips when a Trade Section is Selected */}
                 {selectedFilterCategoryObj && (
-                  <div className="p-3 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700/70 space-y-2">
+                  <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 border border-slate-200/70 dark:border-slate-700/70 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                        Quick Add in {selectedFilterCategoryObj.shortLabel}
+                      <span className="text-xs font-extrabold text-slate-400">Section Total</span>
+                      <span className="text-xl font-black text-indigo-600 dark:text-indigo-400">
+                        {formatINR(filteredExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0))}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => openAddExpenseDrawer({ category: selectedFilterCategoryObj.id })}
-                        className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 underline"
-                      >
-                        + Custom Entry
-                      </button>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                       {selectedFilterCategoryObj.presets.map((preset) => (
                         <button
-                          type="button"
                           key={preset.label}
+                          type="button"
                           onClick={() =>
                             openAddExpenseDrawer({
                               category: selectedFilterCategoryObj.id,
@@ -2615,10 +2855,9 @@ export default function App() {
                               costType: preset.costType
                             })
                           }
-                          className="h-8 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[11px] font-extrabold flex items-center gap-1"
+                          className="h-8 px-3 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-[11px] font-extrabold shrink-0"
                         >
-                          <PlusIcon className="w-3 h-3" />
-                          <span>{preset.label}</span>
+                          + {preset.label}
                         </button>
                       ))}
                     </div>
@@ -2631,30 +2870,29 @@ export default function App() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search wire, tank, chimney, store, vendor..."
+                    placeholder="Search item, store, vendor..."
                     className="w-full h-11 pl-10 pr-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
-                {/* Horizontal Section Filter Pills */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
                   <button
                     type="button"
                     onClick={() => setSelectedCategoryFilter('all')}
-                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                    className={`h-9 px-3.5 rounded-full text-xs font-extrabold shrink-0 ${
                       selectedCategoryFilter === 'all'
                         ? 'bg-indigo-600 text-white'
                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                     }`}
                   >
-                    All Sections
+                    All
                   </button>
                   {INTERIOR_CATEGORIES.map((cat) => (
                     <button
-                      type="button"
                       key={cat.id}
+                      type="button"
                       onClick={() => setSelectedCategoryFilter(cat.id)}
-                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                      className={`h-9 px-3.5 rounded-full text-xs font-extrabold shrink-0 ${
                         selectedCategoryFilter === cat.id
                           ? 'bg-indigo-600 text-white'
                           : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
@@ -2665,31 +2903,30 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Type & Status Filter Pills */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
                   {['all', 'Material', 'Labour', 'Turnkey', 'Lumpsum'].map((ct) => (
                     <button
-                      type="button"
                       key={ct}
+                      type="button"
                       onClick={() => setCostTypeFilter(ct)}
-                      className={`h-7 px-2.5 rounded-xl text-[11px] font-extrabold shrink-0 ${
+                      className={`h-8 px-3 rounded-xl text-[11px] font-extrabold shrink-0 ${
                         costTypeFilter === ct
                           ? 'bg-orange-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
-                      {ct === 'all' ? 'All Types' : ct}
+                      {ct === 'all' ? 'All Types' : ct === 'Turnkey' ? 'With Material' : ct}
                     </button>
                   ))}
                   {['all', 'Paid', 'Advance', 'Pending'].map((st) => (
                     <button
-                      type="button"
                       key={st}
+                      type="button"
                       onClick={() => setStatusFilter(st)}
-                      className={`h-7 px-2.5 rounded-xl text-[11px] font-extrabold shrink-0 ${
+                      className={`h-8 px-3 rounded-xl text-[11px] font-extrabold shrink-0 ${
                         statusFilter === st
                           ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
                       {st === 'all' ? 'Any Status' : st}
@@ -2701,29 +2938,21 @@ export default function App() {
                   {filteredExpenses.length === 0 ? (
                     <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 text-center space-y-3">
                       <p className="text-xs font-bold text-slate-400">
-                        No bills recorded in this section yet.
+                        No bills logged in this section yet.
                       </p>
                       <button
                         type="button"
-                        onClick={() =>
-                          openAddExpenseDrawer(
-                            selectedFilterCategoryObj
-                              ? { category: selectedFilterCategoryObj.id }
-                              : {}
-                          )
-                        }
-                        className="h-10 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+                        onClick={() => openAddExpenseDrawer()}
+                        className="h-11 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
                       >
                         <PlusIcon className="w-4 h-4" />
-                        <span>
-                          Add {selectedFilterCategoryObj ? selectedFilterCategoryObj.shortLabel : 'First'} Bill
-                        </span>
+                        <span>Add Bill Now</span>
                       </button>
                     </div>
                   ) : (
                     filteredExpenses.map((exp) => {
                       const catObj = findCategoryById(exp.category);
-                      const CIcon = catObj.icon || ReceiptIcon;
+                      const CIcon = catObj.icon;
                       const stObj =
                         PAYMENT_STATUSES.find((s) => s.id === exp.status) || PAYMENT_STATUSES[0];
                       return (
@@ -2745,7 +2974,7 @@ export default function App() {
                             </div>
 
                             <div className="text-right shrink-0">
-                              <div className="text-sm font-black">{formatINR(exp.amount)}</div>
+                              <div className="text-base font-black">{formatINR(exp.amount)}</div>
                               <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${stObj.badgeBg}`}>
                                 {exp.status}
                               </span>
@@ -2760,16 +2989,26 @@ export default function App() {
                               <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-bold">
                                 {exp.costType || 'Material'}
                               </span>
-                              {exp.paymentPlan === 'EMI' && (
-                                <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-extrabold">
-                                  EMI{exp.emiDetails ? ` • ${exp.emiDetails}` : ''}
-                                </span>
-                              )}
-                              {exp.warrantyPeriod && exp.warrantyPeriod !== 'No Warranty' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-extrabold">
-                                  <ShieldCheckIcon className="w-3 h-3" />
-                                  {exp.warrantyPeriod}
-                                </span>
+                              {exp.category === 'appliances' && (
+                                <>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-lg font-extrabold ${
+                                      exp.paymentPlan === 'EMI'
+                                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                        : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                    }`}
+                                  >
+                                    {exp.paymentPlan === 'EMI'
+                                      ? `EMI${exp.emiDetails ? ` • ${exp.emiDetails}` : ''}`
+                                      : 'Full Payment'}
+                                  </span>
+                                  {exp.warrantyPeriod && exp.warrantyPeriod !== 'No Warranty' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-extrabold">
+                                      <ShieldCheckIcon className="w-3 h-3" />
+                                      {exp.warrantyPeriod}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </div>
 
@@ -2778,35 +3017,35 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => setReceiptPreviewUrl(exp.receipt || null)}
-                                  className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600"
+                                  className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center"
                                   title="View Photo"
                                 >
-                                  <ImageIcon className="w-3.5 h-3.5" />
+                                  <ImageIcon className="w-4 h-4" />
                                 </button>
                               )}
                               <button
                                 type="button"
                                 onClick={() => openAddExpenseDrawer(exp, true)}
-                                className="p-2 rounded-xl bg-amber-500/10 text-amber-600"
+                                className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center"
                                 title="Repeat / Duplicate Bill"
                               >
-                                <CopyIcon className="w-3.5 h-3.5" />
+                                <CopyIcon className="w-4 h-4" />
                               </button>
                               <button
                                 type="button"
-                                onClick={() => openAddExpenseDrawer(exp)}
-                                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                onClick={() => openAddExpenseDrawer(exp, false)}
+                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center"
                                 title="Edit"
                               >
-                                <EditIcon className="w-3.5 h-3.5" />
+                                <EditIcon className="w-4 h-4" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteExpense(exp.id)}
-                                className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
+                                className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"
                                 title="Delete"
                               >
-                                <TrashIcon className="w-3.5 h-3.5" />
+                                <TrashIcon className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -2818,21 +3057,129 @@ export default function App() {
               </section>
             )}
 
-            {/* TAB 3: CARPENTRY MAJURI KHATA (MAIN CARPENTER DEFAULT + CUSTOM VENDORS) */}
+            {/* TAB 3: VENDORS & MILESTONES */}
+            {activeTab === 'vendors' && (
+              <section className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black">Contractors &amp; Vendors</h2>
+                    <p className="text-xs text-slate-400">
+                      Pending Dues: <strong className="text-rose-500">{formatINR(analytics.totalVendorDues)}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsVendorModalOpen(true)}
+                    className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                    <span>Add Vendor</span>
+                  </button>
+                </div>
+
+                {analytics.vendorStats.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 text-center space-y-3">
+                    <p className="text-xs font-bold text-slate-400">
+                      No contractors or vendors added yet.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsVendorModalOpen(true)}
+                      className="h-11 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      <span>Add First Vendor</span>
+                    </button>
+                  </div>
+                ) : (
+                  analytics.vendorStats.map((v) => (
+                    <div
+                      key={v.id}
+                      className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-base font-black">{v.name}</h3>
+                          <p className="text-xs text-slate-400">{v.trade}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleShareWhatsApp(
+                              `*HomeLedger Vendor Ledger — ${v.name}*\nAgreed Quote: ${formatINR(v.quoted)}\nPaid So Far: *${formatINR(v.paidToVendor)}*\nBalance Payable: *${formatINR(v.balanceRemaining)}*`
+                            )
+                          }
+                          className="h-9 px-3 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold flex items-center gap-1"
+                        >
+                          <ArrowUpRightIcon className="w-4 h-4" />
+                          <span>Share</span>
+                        </button>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-bold mb-1.5">
+                          <span className="text-emerald-600">Paid: {formatINR(v.paidToVendor)}</span>
+                          <span className="text-rose-500">Due: {formatINR(v.balanceRemaining)}</span>
+                        </div>
+                        <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full"
+                            style={{ width: `${v.progressPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {v.milestones.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {v.milestones.map((ms) => (
+                            <div
+                              key={ms.id}
+                              className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-700/60"
+                            >
+                              <div>
+                                <div className="text-xs font-extrabold">{ms.label}</div>
+                                <div className="text-[11px] font-semibold text-slate-400">
+                                  {formatINR(ms.amount)} • {ms.dueDate}
+                                </div>
+                              </div>
+                              {ms.status === 'Paid' ? (
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 text-[11px] font-extrabold">
+                                  Paid ✓
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkMilestonePaid(v, ms)}
+                                  className="h-9 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
+                                >
+                                  Pay Now
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </section>
+            )}
+
+            {/* TAB 4: SMART CARPENTRY MAJURI KHATA (WITH MAIN CARPENTER + CUSTOM VENDOR) */}
             {activeTab === 'majuri' && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                      Main Carpenter &amp; Vendors Khata
+                      Main Carpenter &amp; Vendors
                     </span>
-                    <h2 className="text-lg font-black">Carpenter Majuri</h2>
+                    <h2 className="text-lg font-black">Carpentry Majuri</h2>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={handlePrintGraphicalPDF}
-                      className="h-10 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm"
+                      className="h-10 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
                     >
                       <PrinterIcon className="w-3.5 h-3.5" />
                       <span>PDF</span>
@@ -2840,12 +3187,12 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        const scopeName =
+                        const scopeLabel =
                           selectedMajuriVendorFilter === 'all'
-                            ? 'All Carpenters'
+                            ? 'All Vendors'
                             : selectedMajuriVendorFilter;
                         const roomLines = majuriSummary.rooms
-                          .filter((r) => r.amount > 0)
+                          .filter((r) => r.sqft > 0 || r.amount > 0)
                           .map((r) => `• ${r.label}: ${r.sqft} ft² = ${formatINR(r.amount)}`)
                           .join('\n');
                         const balanceLine =
@@ -2853,10 +3200,10 @@ export default function App() {
                             ? `Net Payable: *${formatINR(majuriSummary.netBalance)}*`
                             : `Extra Advance Credit: *${formatINR(Math.abs(majuriSummary.netBalance))}*`;
                         handleShareWhatsApp(
-                          `*HomeLedger Carpenter Majuri (${scopeName})*\nTotal Measured Work: ${majuriSummary.totalSqft} ft² = *${formatINR(majuriSummary.totalWorkBill)}*\nAdvances Paid (No Meas.): *${formatINR(majuriSummary.totalAdvancePaid)}*\n${balanceLine}${roomLines ? `\n\n*Room Summary:*\n${roomLines}` : ''}`
+                          `*HomeLedger Carpenter Majuri (${scopeLabel})*\nMeasured Work: ${majuriSummary.totalSqft} ft² = *${formatINR(majuriSummary.totalWorkBill)}*\nAdvance Paid (No Measurement): *${formatINR(majuriSummary.totalAdvancePaid)}*\n${balanceLine}${roomLines ? `\n\n*Room Breakdown:*\n${roomLines}` : ''}`
                         );
                       }}
-                      className="h-10 px-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm"
+                      className="h-10 px-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1"
                     >
                       <ArrowUpRightIcon className="w-3.5 h-3.5" />
                       <span>Share</span>
@@ -2864,12 +3211,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Vendor / Carpenter Filter Pills */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                {/* Vendor Filter Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
                   <button
                     type="button"
                     onClick={() => setSelectedMajuriVendorFilter('all')}
-                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                    className={`h-9 px-3.5 rounded-full text-xs font-extrabold shrink-0 ${
                       selectedMajuriVendorFilter === 'all'
                         ? 'bg-orange-600 text-white'
                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
@@ -2879,10 +3226,10 @@ export default function App() {
                   </button>
                   {majuriVendorOptions.map((vName) => (
                     <button
-                      type="button"
                       key={vName}
+                      type="button"
                       onClick={() => setSelectedMajuriVendorFilter(vName)}
-                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                      className={`h-9 px-3.5 rounded-full text-xs font-extrabold shrink-0 ${
                         selectedMajuriVendorFilter === vName
                           ? 'bg-orange-600 text-white'
                           : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
@@ -2893,18 +3240,18 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Running Khata Summary Card */}
+                {/* Running Khata Card */}
                 <div className="bg-gradient-to-br from-orange-600 to-amber-600 text-white rounded-3xl p-4 shadow-lg shadow-orange-600/20 space-y-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-orange-100">
-                        {selectedMajuriVendorFilter === 'all' ? 'Total Work' : selectedMajuriVendorFilter} ({majuriSummary.totalSqft} ft²)
+                        {selectedMajuriVendorFilter === 'all' ? 'All Carpenters' : selectedMajuriVendorFilter} • {majuriSummary.totalSqft} ft²
                       </span>
-                      <div className="text-2xl font-black mt-0.5">
+                      <div className="text-3xl font-black mt-0.5">
                         {formatINR(majuriSummary.totalWorkBill)}
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-white/20 text-xs font-extrabold">
+                    <span className="px-2.5 py-1 rounded-full bg-white/20 text-xs font-extrabold shrink-0">
                       {majuriSummary.settledPct}% Paid
                     </span>
                   </div>
@@ -2916,10 +3263,10 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
                     <div className="p-2.5 rounded-2xl bg-white/15">
                       <span className="text-[10px] font-bold uppercase text-orange-100 block">
-                        Advances Paid (No Meas.)
+                        Advance Paid (No Meas.)
                       </span>
                       <span className="text-sm font-black">
                         {formatINR(majuriSummary.totalAdvancePaid)}
@@ -2927,7 +3274,7 @@ export default function App() {
                     </div>
                     <div className="p-2.5 rounded-2xl bg-white/15">
                       <span className="text-[10px] font-bold uppercase text-orange-100 block">
-                        {majuriSummary.netBalance >= 0 ? 'Balance Payable' : 'Extra Advance'}
+                        {majuriSummary.netBalance >= 0 ? 'Balance Payable' : 'Advance Credit'}
                       </span>
                       <span className="text-sm font-black">
                         {formatINR(Math.abs(majuriSummary.netBalance))}
@@ -2936,69 +3283,73 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Vendor-Wise Khata Breakdown when viewing All */}
-                {selectedMajuriVendorFilter === 'all' && majuriSummary.vendorBreakdown.length > 1 && (
+                {/* Per-Vendor Breakdown Card when viewing All Vendors */}
+                {selectedMajuriVendorFilter === 'all' && majuriSummary.vendorBreakdown.length > 0 && (
                   <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-3.5 border border-slate-200/70 dark:border-slate-700/70 space-y-2">
-                    <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                      Carpenter &amp; Vendor Summary
-                    </div>
+                    <h3 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                      Vendor-Wise Majuri Khata
+                    </h3>
                     {majuriSummary.vendorBreakdown.map((vb) => (
                       <button
-                        type="button"
                         key={vb.vendorName}
+                        type="button"
                         onClick={() => setSelectedMajuriVendorFilter(vb.vendorName)}
-                        className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 text-left"
+                        className="w-full text-left p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 flex items-center justify-between gap-2"
                       >
-                        <div>
-                          <div className="text-xs font-extrabold">{vb.vendorName}</div>
-                          <div className="text-[10px] text-slate-400">
+                        <div className="min-w-0">
+                          <div className="text-xs font-black truncate">{vb.vendorName}</div>
+                          <div className="text-[10px] font-semibold text-slate-400">
                             {vb.sqft} ft² • Work {formatINR(vb.workBill, true)} • Adv {formatINR(vb.advances, true)}
                           </div>
                         </div>
                         <span
-                          className={`text-xs font-black ${
-                            vb.balance >= 0 ? 'text-rose-500' : 'text-amber-500'
+                          className={`text-xs font-black px-2.5 py-1 rounded-xl shrink-0 ${
+                            vb.balance >= 0
+                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                           }`}
                         >
-                          {vb.balance >= 0 ? `Due ${formatINR(vb.balance, true)}` : `Adv +${formatINR(Math.abs(vb.balance), true)}`}
+                          {vb.balance >= 0 ? `Due ${formatINR(vb.balance, true)}` : `Cr ${formatINR(Math.abs(vb.balance), true)}`}
                         </span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                {/* Horizontal Room Filter Pills */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                {/* Horizontal Swipeable Room Filter Pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1">
                   <button
                     type="button"
                     onClick={() => setSelectedMajuriRoomFilter('all')}
-                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                    className={`px-3.5 py-2 rounded-2xl text-xs font-extrabold shrink-0 border ${
                       selectedMajuriRoomFilter === 'all'
-                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                     }`}
                   >
                     All Rooms
                   </button>
-                  {majuriSummary.rooms.map((room) => (
-                    <button
-                      type="button"
-                      key={room.id}
-                      onClick={() =>
-                        setSelectedMajuriRoomFilter(selectedMajuriRoomFilter === room.id ? 'all' : room.id)
-                      }
-                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
-                        selectedMajuriRoomFilter === room.id
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {room.shortLabel} ({room.sqft} ft²)
-                    </button>
-                  ))}
+                  {majuriSummary.rooms.map((room) => {
+                    const active = selectedMajuriRoomFilter === room.id;
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => setSelectedMajuriRoomFilter(active ? 'all' : room.id)}
+                        className={`px-3.5 py-2 rounded-2xl text-xs font-extrabold shrink-0 border flex items-center gap-1.5 ${
+                          active
+                            ? 'bg-orange-500/15 border-orange-500 text-orange-700 dark:text-orange-300'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <span>{room.shortLabel}</span>
+                        <span className="opacity-70">({formatINR(room.amount, true)})</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Unified Action Toggle: Measure Work vs. Advance Payment (Without Measurement) */}
+                {/* Unified Segmented Form Card: Measure Work OR Advance Payment (Without Measurement) */}
                 <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3">
                   <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl">
                     <button
@@ -3027,50 +3378,31 @@ export default function App() {
 
                   {majuriActionMode === 'measure' ? (
                     <form onSubmit={handleSaveMajuriEntry} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-400">
-                          Main Carpenter or select vendor
-                        </span>
-                        <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-0.5 text-[11px] font-extrabold">
-                          {['ft', 'in'].map((u) => (
-                            <button
-                              key={u}
-                              type="button"
-                              onClick={() => setMjUnit(u)}
-                              className={`px-2.5 py-1 rounded-lg ${
-                                mjUnit === u ? 'bg-orange-600 text-white' : 'text-slate-500'
-                              }`}
-                            >
-                              {u === 'ft' ? 'Feet' : 'Inches'}
-                            </button>
+                      <div className="space-y-2">
+                        <select
+                          value={mjVendorSelect}
+                          onChange={(e) => setMjVendorSelect(e.target.value)}
+                          className="w-full h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        >
+                          {majuriVendorOptions.map((vName) => (
+                            <option key={vName} value={vName}>
+                              Carpenter: {vName}
+                            </option>
                           ))}
-                        </div>
+                          <option value="__custom__">+ Add New Carpenter / Vendor...</option>
+                        </select>
+
+                        {mjVendorSelect === '__custom__' && (
+                          <input
+                            type="text"
+                            required
+                            value={mjCustomVendor}
+                            onChange={(e) => setMjCustomVendor(e.target.value)}
+                            placeholder="Enter new carpenter or vendor name..."
+                            className="w-full h-11 px-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-xs font-extrabold"
+                          />
+                        )}
                       </div>
-
-                      {/* Carpenter / Vendor Selector */}
-                      <select
-                        value={mjVendorSelect}
-                        onChange={(e) => setMjVendorSelect(e.target.value)}
-                        className="w-full h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                      >
-                        {majuriVendorOptions.map((vName) => (
-                          <option key={vName} value={vName}>
-                            {vName}
-                          </option>
-                        ))}
-                        <option value="__custom__">+ Add New Vendor / Sub-Contractor...</option>
-                      </select>
-
-                      {mjVendorSelect === '__custom__' && (
-                        <input
-                          type="text"
-                          required
-                          value={mjCustomVendor}
-                          onChange={(e) => setMjCustomVendor(e.target.value)}
-                          placeholder="Enter vendor / sub-contractor name..."
-                          className="w-full h-11 px-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-xs font-extrabold"
-                        />
-                      )}
 
                       <div className="grid grid-cols-2 gap-2">
                         <select
@@ -3084,33 +3416,46 @@ export default function App() {
                             </option>
                           ))}
                         </select>
+                        <div className="flex rounded-2xl bg-slate-100 dark:bg-slate-900 p-1 text-xs font-extrabold">
+                          {['ft', 'in'].map((u) => (
+                            <button
+                              key={u}
+                              type="button"
+                              onClick={() => setMjUnit(u)}
+                              className={`flex-1 rounded-xl ${
+                                mjUnit === u ? 'bg-orange-600 text-white' : 'text-slate-500'
+                              }`}
+                            >
+                              {u === 'ft' ? 'Feet' : 'Inches'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Work Item + Quantity Multiplier Stepper */}
+                      <div className="flex gap-2">
                         <input
                           type="text"
                           value={mjItem}
                           onChange={(e) => setMjItem(e.target.value)}
-                          placeholder="Item (e.g. Wardrobe)"
-                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                          placeholder="Item (e.g. Wardrobe, Loft, TV Unit)"
+                          className="flex-1 h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                         />
-                      </div>
-
-                      {/* Quantity Multiplier Stepper (×1, ×2, ×3) */}
-                      <div className="flex items-center justify-between px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                        <span className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
-                          Quantity (Identical Units)
-                        </span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => setMjQty((q) => Math.max(1, q - 1))}
-                            className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 text-sm font-black"
+                            className="w-7 h-8 rounded-xl text-sm font-black text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800"
                           >
                             −
                           </button>
-                          <span className="w-8 text-center text-xs font-black">×{mjQty}</span>
+                          <span className="px-2 text-xs font-black text-orange-600 dark:text-orange-400">
+                            ×{mjQty}
+                          </span>
                           <button
                             type="button"
                             onClick={() => setMjQty((q) => q + 1)}
-                            className="w-8 h-8 rounded-xl bg-orange-600 text-white text-sm font-black"
+                            className="w-7 h-8 rounded-xl text-sm font-black text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800"
                           >
                             +
                           </button>
@@ -3123,7 +3468,7 @@ export default function App() {
                           step="any"
                           value={mjHeight}
                           onChange={(e) => setMjHeight(e.target.value)}
-                          placeholder={`H (${mjUnit})`}
+                          placeholder={`Height (${mjUnit})`}
                           className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                         />
                         <input
@@ -3131,7 +3476,7 @@ export default function App() {
                           step="any"
                           value={mjWidth}
                           onChange={(e) => setMjWidth(e.target.value)}
-                          placeholder={`W (${mjUnit})`}
+                          placeholder={`Width (${mjUnit})`}
                           className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                         />
                         <input
@@ -3139,97 +3484,87 @@ export default function App() {
                           step="any"
                           value={mjRate}
                           onChange={(e) => setMjRate(e.target.value)}
-                          placeholder="₹/ft²"
+                          placeholder="₹ / ft²"
                           className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                         />
                       </div>
 
-                      {/* Smart Rate Presets (₹300, ₹200, ₹150) */}
+                      {/* Smart Rate Presets: ₹300, ₹200, ₹150 */}
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px] font-bold text-slate-400 shrink-0">Rate:</span>
-                        {RATE_PRESETS.map((rateVal) => (
-                          <button
-                            key={rateVal}
-                            type="button"
-                            onClick={() => setMjRate(String(rateVal))}
-                            className={`flex-1 h-8 rounded-xl text-xs font-extrabold transition-colors ${
-                              Number(mjRate) === rateVal
-                                ? 'bg-orange-600 text-white'
-                                : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
-                            }`}
-                          >
-                            ₹{rateVal}/ft²
-                          </button>
-                        ))}
+                        {RATE_PRESETS.map((rateVal) => {
+                          const active = Number(mjRate) === rateVal;
+                          return (
+                            <button
+                              key={rateVal}
+                              type="button"
+                              onClick={() => setMjRate(String(rateVal))}
+                              className={`flex-1 h-9 rounded-xl text-xs font-extrabold border transition-all ${
+                                active
+                                  ? 'bg-orange-600 text-white border-orange-600'
+                                  : 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20'
+                              }`}
+                            >
+                              ₹{rateVal}/ft²
+                            </button>
+                          );
+                        })}
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-500/10">
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20">
                         <div>
                           <span className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400 block">
-                            {liveMajuriCalc.qty > 1 ? `${liveMajuriCalc.qty} pcs • ` : ''}
-                            {liveMajuriCalc.sqft} ft² × ₹{mjRate || 0}
+                            {mjQty > 1 ? `${mjQty} pcs • ` : ''}{liveMajuriCalc.sqft} ft² @ ₹{mjRate || 0}
                           </span>
-                          <span className="text-base font-black text-orange-700 dark:text-orange-300">
-                            {formatINR(liveMajuriCalc.amount)}
-                          </span>
+                          <span className="text-base font-black">{formatINR(liveMajuriCalc.amount)}</span>
                         </div>
                         <button
                           type="submit"
                           className="h-11 px-5 rounded-2xl bg-orange-600 text-white text-xs font-extrabold"
                         >
-                          Save Item
+                          Save Work
                         </button>
                       </div>
                     </form>
                   ) : (
                     <form onSubmit={handleSaveCarpenterAdvance} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-400">
-                          Advance payment without measurement
-                        </span>
-                        <label className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={advSyncToBills}
-                            onChange={(e) => setAdvSyncToBills(e.target.checked)}
-                            className="rounded text-emerald-600"
-                          />
-                          <span>Sync to Bills</span>
-                        </label>
+                      <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                        Direct advance payment paid to carpenter without room measurement.
                       </div>
 
-                      {/* Carpenter / Vendor Selector for Advance Payment */}
-                      <select
-                        value={advVendorSelect}
-                        onChange={(e) => setAdvVendorSelect(e.target.value)}
-                        className="w-full h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
-                      >
-                        {majuriVendorOptions.map((vName) => (
-                          <option key={vName} value={vName}>
-                            {vName}
-                          </option>
-                        ))}
-                        <option value="__custom__">+ Add New Vendor / Sub-Contractor...</option>
-                      </select>
+                      <div className="space-y-2">
+                        <select
+                          value={advVendorSelect}
+                          onChange={(e) => setAdvVendorSelect(e.target.value)}
+                          className="w-full h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        >
+                          {majuriVendorOptions.map((vName) => (
+                            <option key={vName} value={vName}>
+                              Pay To: {vName}
+                            </option>
+                          ))}
+                          <option value="__custom__">+ Add New Carpenter / Vendor...</option>
+                        </select>
 
-                      {advVendorSelect === '__custom__' && (
-                        <input
-                          type="text"
-                          required
-                          value={advCustomVendor}
-                          onChange={(e) => setAdvCustomVendor(e.target.value)}
-                          placeholder="Enter vendor / sub-contractor name..."
-                          className="w-full h-11 px-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-extrabold"
-                        />
-                      )}
+                        {advVendorSelect === '__custom__' && (
+                          <input
+                            type="text"
+                            required
+                            value={advCustomVendor}
+                            onChange={(e) => setAdvCustomVendor(e.target.value)}
+                            placeholder="Enter new carpenter or vendor name..."
+                            className="w-full h-11 px-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-extrabold"
+                          />
+                        )}
+                      </div>
 
-                      <div className="flex gap-1.5">
+                      <div className="grid grid-cols-4 gap-1.5">
                         {[5000, 10000, 20000, 30000].map((chip) => (
                           <button
                             key={chip}
                             type="button"
                             onClick={() => setAdvAmount(String((Number(advAmount) || 0) + chip))}
-                            className="flex-1 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold"
+                            className="h-9 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold"
                           >
                             +₹{chip / 1000}k
                           </button>
@@ -3241,23 +3576,23 @@ export default function App() {
                           type="number"
                           value={advAmount}
                           onChange={(e) => setAdvAmount(e.target.value)}
-                          placeholder="Advance ₹ Amount"
-                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                          placeholder="Advance Amount (₹)"
+                          className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
                         />
                         <input
                           type="text"
                           value={advWeekLabel}
                           onChange={(e) => setAdvWeekLabel(e.target.value)}
-                          placeholder="Label (e.g. Advance #1)"
-                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                          placeholder="Label (e.g. Site Advance)"
+                          className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <select
                           value={advMode}
                           onChange={(e) => setAdvMode(e.target.value)}
-                          className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                         >
                           <option value="UPI">UPI</option>
                           <option value="Cash">Cash</option>
@@ -3267,32 +3602,45 @@ export default function App() {
                           type="date"
                           value={advDate}
                           onChange={(e) => setAdvDate(e.target.value)}
-                          className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                         />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={advSyncToBills}
+                            onChange={(e) => setAdvSyncToBills(e.target.checked)}
+                            className="w-4 h-4 rounded text-emerald-600"
+                          />
+                          <span>Sync to Bills &amp; Vendor Ledger</span>
+                        </label>
                         <button
                           type="submit"
-                          className="h-11 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold"
+                          className="h-11 px-5 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold"
                         >
-                          Pay Advance
+                          Save Advance
                         </button>
                       </div>
                     </form>
                   )}
                 </div>
 
-                {/* Measured Work Items List */}
+                {/* Measured Items List */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
                     Measured Items ({filteredMajuriEntries.length})
                   </h3>
                   {filteredMajuriEntries.length === 0 ? (
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
-                      No measured items yet. Use "+ Measure Work" above.
+                    <div className="bg-white dark:bg-slate-800/90 p-5 rounded-2xl text-center text-xs font-bold text-slate-400">
+                      No measured items yet — use &ldquo;+ Measure Work&rdquo; above.
                     </div>
                   ) : (
                     filteredMajuriEntries.map((m) => {
                       const room = MAJURI_ROOMS.find((r) => r.id === m.roomId);
-                      const qtyText = (m.qty || 1) > 1 ? `${m.qty} × ` : '';
+                      const vName = m.vendorName || DEFAULT_CARPENTER_VENDOR;
+                      const qtyText = m.qty && m.qty > 1 ? `${m.qty}× ` : '';
                       return (
                         <div
                           key={m.id}
@@ -3301,34 +3649,34 @@ export default function App() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[10px] font-extrabold uppercase text-orange-600">
-                                {room?.label}
+                                {room?.shortLabel}
                               </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
-                                {m.vendorName || DEFAULT_CARPENTER_VENDOR}
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-slate-500">
+                                {vName}
                               </span>
                             </div>
                             <div className="text-xs font-extrabold truncate mt-0.5">{m.item}</div>
                             <div className="text-[11px] text-slate-400">
-                              {qtyText}{m.height}{m.unit} × {m.width}{m.unit} = {m.sqft} ft² @ ₹{m.rate}/ft²
+                              {qtyText}{m.height}{m.unit} × {m.width}{m.unit} = {m.sqft} ft² @ ₹{m.rate}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-sm font-black">{formatINR(m.amount)}</span>
+                            <span className="text-sm font-black mr-0.5">{formatINR(m.amount)}</span>
                             <button
                               type="button"
                               onClick={() => handleRepeatMajuriEntry(m)}
-                              title="Repeat Measurement"
-                              className="p-2 rounded-xl bg-amber-500/10 text-amber-600"
+                              title="Repeat / Duplicate Measurement"
+                              className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center"
                             >
                               <CopyIcon className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteMajuriEntry(m.id)}
-                              title="Delete"
-                              className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
+                              title="Delete Measurement"
+                              className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"
                             >
-                              <TrashIcon className="w-3.5 h-3.5" />
+                              <TrashIcon className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -3337,14 +3685,14 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Advance Payments (Without Measurement) History List */}
+                {/* Advance Payments (Without Measurement) History */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
                     Advances Paid Without Measurement ({filteredCarpenterAdvances.length})
                   </h3>
                   {filteredCarpenterAdvances.length === 0 ? (
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
-                      No advance payments recorded yet.
+                    <div className="bg-white dark:bg-slate-800/90 p-5 rounded-2xl text-center text-xs font-bold text-slate-400">
+                      No advance payments logged yet.
                     </div>
                   ) : (
                     filteredCarpenterAdvances.map((a) => (
@@ -3352,27 +3700,27 @@ export default function App() {
                         key={a.id}
                         className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
                       >
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-extrabold">{a.weekLabel}</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                            <span className="text-xs font-extrabold truncate">{a.weekLabel}</span>
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                               {a.vendorName || DEFAULT_CARPENTER_VENDOR}
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
-                            {a.date} • {a.mode} • By {a.paidBy}
+                            {a.date} • {a.mode} • Without measurement
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-black text-emerald-600">
                             {formatINR(a.amount)}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleDeleteCarpenterAdvance(a.id)}
-                            className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
+                            className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"
                           >
-                            <TrashIcon className="w-3.5 h-3.5" />
+                            <TrashIcon className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -3381,169 +3729,84 @@ export default function App() {
                 </div>
               </section>
             )}
-
-            {/* TAB 4: CONTRACTORS & VENDORS */}
-            {activeTab === 'vendors' && (
-              <section className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black">Contractors &amp; Vendors</h2>
-                    <p className="text-xs text-slate-400">
-                      Pending Dues: <strong className="text-rose-500">{formatINR(analytics.totalVendorDues)}</strong>
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsVendorModalOpen(true)}
-                    className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                    <span>Add</span>
-                  </button>
-                </div>
-
-                {analytics.vendorStats.length === 0 ? (
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 text-center space-y-3">
-                    <p className="text-xs font-bold text-slate-400">
-                      No additional vendors added yet (Main Carpenter is active in Majuri).
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setIsVendorModalOpen(true)}
-                      className="h-10 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                      <span>Add Contractor / Vendor</span>
-                    </button>
-                  </div>
-                ) : (
-                  analytics.vendorStats.map((v) => (
-                    <div
-                      key={v.id}
-                      className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-sm font-black">{v.name}</h3>
-                          <p className="text-xs text-slate-400">{v.trade}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleShareWhatsApp(
-                              `*HomeLedger Vendor Ledger — ${v.name}*\nAgreed Quote: ${formatINR(v.quoted)}\nPaid So Far: *${formatINR(v.paidToVendor)}*\nBalance Payable: *${formatINR(v.balanceRemaining)}*`
-                            )
-                          }
-                          className="h-8 px-2.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold flex items-center gap-1"
-                        >
-                          <ArrowUpRightIcon className="w-3.5 h-3.5" />
-                          <span>Share</span>
-                        </button>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs font-bold mb-1">
-                          <span className="text-emerald-600">Paid: {formatINR(v.paidToVendor)}</span>
-                          <span className="text-rose-500">Due: {formatINR(v.balanceRemaining)}</span>
-                        </div>
-                        <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 rounded-full"
-                            style={{ width: `${v.progressPct}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {v.milestones.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          {v.milestones.map((ms) => (
-                            <div
-                              key={ms.id}
-                              className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-700/60"
-                            >
-                              <div>
-                                <div className="text-xs font-extrabold">{ms.label}</div>
-                                <div className="text-[10px] font-semibold text-slate-400">
-                                  {formatINR(ms.amount)} • Due {ms.dueDate}
-                                </div>
-                              </div>
-                              {ms.status === 'Paid' ? (
-                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 text-[10px] font-extrabold">
-                                  Paid ✓
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleMarkMilestonePaid(v, ms)}
-                                  className="h-8 px-3 rounded-xl bg-indigo-600 text-white text-[11px] font-extrabold"
-                                >
-                                  Pay Now
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </section>
-            )}
           </main>
 
-          {/* ================= STREAMLINED 5-ITEM BOTTOM NAVIGATION BAR WITH CENTER (+) ================= */}
+          {/* ================= 5-SLOT BOTTOM NAVIGATION WITH EMBEDDED (+) ================= */}
           <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800 px-2 py-2 grid grid-cols-5 items-center gap-1">
-            {[
-              { id: 'overview', label: 'Home', icon: LayoutGridIcon },
-              { id: 'expenses', label: 'Bills', icon: ReceiptIcon },
-              { id: '__add__', label: 'Add', icon: PlusIcon },
-              { id: 'majuri', label: 'Majuri', icon: RulerIcon },
-              { id: 'vendors', label: 'Vendors', icon: HardHatIcon }
-            ].map((tab) => {
-              if (tab.id === '__add__') {
-                return (
-                  <div key="add-center" className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => openAddExpenseDrawer()}
-                      aria-label="Add Expense"
-                      className="w-13 h-13 -mt-5 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/35 flex items-center justify-center active:scale-95 transition-transform"
-                    >
-                      <PlusIcon className="w-6 h-6" />
-                    </button>
-                  </div>
-                );
-              }
-              const TIcon = tab.icon;
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  type="button"
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
-                    active
-                      ? 'text-indigo-600 dark:text-indigo-400'
-                      : 'text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <TIcon className="w-5 h-5" />
-                  <span className="text-[10px] font-extrabold mt-0.5">{tab.label}</span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              onClick={() => setActiveTab('overview')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
+                activeTab === 'overview'
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-slate-400'
+              }`}
+            >
+              <LayoutGridIcon className="w-5 h-5" />
+              <span className="text-[10px] font-extrabold mt-0.5">Home</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('expenses')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
+                activeTab === 'expenses'
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-slate-400'
+              }`}
+            >
+              <ReceiptIcon className="w-5 h-5" />
+              <span className="text-[10px] font-extrabold mt-0.5">Bills</span>
+            </button>
+
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => openAddExpenseDrawer()}
+                aria-label="Quick Add Bill"
+                className="w-13 h-13 -mt-5 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/35 flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <PlusIcon className="w-7 h-7" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('majuri')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
+                activeTab === 'majuri'
+                  ? 'text-orange-600 dark:text-orange-400'
+                  : 'text-slate-400'
+              }`}
+            >
+              <RulerIcon className="w-5 h-5" />
+              <span className="text-[10px] font-extrabold mt-0.5">Majuri</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('vendors')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
+                activeTab === 'vendors'
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-slate-400'
+              }`}
+            >
+              <HardHatIcon className="w-5 h-5" />
+              <span className="text-[10px] font-extrabold mt-0.5">Vendors</span>
+            </button>
           </nav>
 
-          {/* ================= SIMPLIFIED 3-TAP QUICK ADD BILL DRAWER ================= */}
+          {/* ================= STREAMLINED 3-TAP ADD BILL DRAWER ================= */}
           {isAddDrawerOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
               <form
                 onSubmit={handleSaveExpense}
                 className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-black">
-                    {editingExpenseId ? 'Edit Bill' : 'Add Interior / Appliance Bill'}
+                    {editingExpenseId ? 'Edit Bill' : 'Add Interior / Shopping Bill'}
                   </h3>
                   <button
                     type="button"
@@ -3554,12 +3817,10 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Big Clear Amount Input + Quick Chips */}
+                {/* Big Amount Input + Quick Chips */}
                 <div className="space-y-2">
                   <div className="relative">
-                    <span className="text-2xl font-black text-indigo-600 absolute left-4 top-1/2 -translate-y-1/2">
-                      ₹
-                    </span>
+                    <span className="text-xl font-black text-indigo-600 absolute left-4 top-1/2 -translate-y-1/2">₹</span>
                     <input
                       type="number"
                       required
@@ -3583,8 +3844,15 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Trade & Shopping Section Grid */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* Duplicate Bill Warning Banner */}
+                {duplicateBillWarning && (
+                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-[11px] font-extrabold text-amber-700 dark:text-amber-300">
+                    Heads up: A bill of {formatINR(duplicateBillWarning.amount)} for &ldquo;{duplicateBillWarning.vendor}&rdquo; already exists on {duplicateBillWarning.date}.
+                  </div>
+                )}
+
+                {/* Visual Trade & Shopping Section Grid */}
+                <div className="grid grid-cols-4 gap-1.5">
                   {INTERIOR_CATEGORIES.map((cat) => {
                     const CIcon = cat.icon;
                     const selected = formCategory === cat.id;
@@ -3593,14 +3861,14 @@ export default function App() {
                         key={cat.id}
                         type="button"
                         onClick={() => handleSelectDrawerCategory(cat.id)}
-                        className={`p-2.5 rounded-2xl border flex flex-col items-center gap-1 text-center ${
+                        className={`p-2 rounded-2xl border flex flex-col items-center gap-1 text-center ${
                           selected
                             ? 'bg-indigo-600 text-white border-indigo-600'
                             : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                         }`}
                       >
                         <CIcon className="w-4 h-4" />
-                        <span className="text-[11px] font-extrabold truncate w-full">
+                        <span className="text-[10px] font-extrabold truncate w-full">
                           {cat.shortLabel}
                         </span>
                       </button>
@@ -3608,57 +3876,46 @@ export default function App() {
                   })}
                 </div>
 
-                {/* Smart 1-Tap Item Presets for Selected Trade / Shopping Section */}
+                {/* Context-Smart Item Presets for Selected Trade / Appliance */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                    Quick Items ({activeCategoryObj.shortLabel})
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {activeCategoryObj.presets.map((preset) => {
-                      const isActivePreset = formTitle === preset.label;
-                      return (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => {
-                            setFormTitle(preset.label);
-                            setFormCostType(preset.costType);
-                          }}
-                          className={`h-8 px-2.5 rounded-xl text-[11px] font-extrabold transition-colors ${
-                            isActivePreset
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      );
-                    })}
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Quick {activeCategoryObj.shortLabel} Items (Tap or Type Below)
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {activeCategoryObj.presets.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setFormTitle(preset.label);
+                          setFormCostType(preset.costType);
+                        }}
+                        className={`h-8 px-3 rounded-xl text-[11px] font-extrabold shrink-0 border ${
+                          formTitle === preset.label
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Editable Item Description Input */}
+                {/* Editable Item Description */}
                 <input
                   type="text"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder={
                     formCategory === 'appliances'
-                      ? 'Appliance name (Fan, Stove, Chimney, or custom...)'
-                      : 'Item description (editable)...'
+                      ? 'Appliance name (e.g. Fan, Stove, Chimney, AC...)'
+                      : `Item / Work description (${activeCategoryObj.shortLabel})`
                   }
                   className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                 />
 
-                {/* Duplicate Bill Guard Alert */}
-                {duplicateBillWarning && (
-                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-800 dark:text-amber-200">
-                    Heads up: A bill of <strong>{formatINR(duplicateBillWarning.amount)}</strong> for{' '}
-                    <strong>{duplicateBillWarning.vendor}</strong> on {duplicateBillWarning.date} is already logged.
-                  </div>
-                )}
-
-                {/* Status & Payment Mode Row */}
+                {/* Payment Mode & Status */}
                 <div className="grid grid-cols-2 gap-2">
                   <select
                     value={formMode}
@@ -3684,7 +3941,7 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Collapsible Extra Details Toggle (Hidden by default for a clean 3-tap UI) */}
+                {/* Collapsible More Details */}
                 <button
                   type="button"
                   onClick={() => setShowMoreBillFields(!showMoreBillFields)}
@@ -3693,87 +3950,79 @@ export default function App() {
                   {showMoreBillFields
                     ? '− Hide Extra Details'
                     : formCategory === 'appliances'
-                    ? '+ Store, EMI, Warranty & Bill Photo'
-                    : '+ Vendor, Type, Date & Bill Photo'}
+                      ? '+ Store, EMI, Warranty & Bill Photo'
+                      : '+ Vendor, Work Type, Date & Bill Photo'}
                 </button>
 
                 {showMoreBillFields && (
                   <div className="space-y-3 pt-1">
                     {formCategory === 'appliances' ? (
-                      <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 space-y-2.5">
-                        <div className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
-                          Store / Source, Payment Plan &amp; Warranty
+                      <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 space-y-2.5">
+                        <div className="text-[11px] font-black text-cyan-700 dark:text-cyan-300">
+                          Purchase Store, Payment Plan &amp; Warranty
                         </div>
-                        <input
-                          type="text"
-                          value={formVendor}
-                          onChange={(e) => setFormVendor(e.target.value)}
-                          placeholder="Where did you purchase? (e.g. Croma, Amazon, Local Store)"
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                        />
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                           {PURCHASE_SOURCE_SUGGESTIONS.map((store) => (
                             <button
                               key={store}
                               type="button"
                               onClick={() => setFormVendor(store)}
-                              className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
+                              className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold shrink-0 border ${
                                 formVendor === store
-                                  ? 'bg-cyan-600 text-white'
-                                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  ? 'bg-cyan-600 text-white border-cyan-600'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                               }`}
                             >
                               {store}
                             </button>
                           ))}
                         </div>
-
-                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        <input
+                          type="text"
+                          value={formVendor}
+                          onChange={(e) => setFormVendor(e.target.value)}
+                          placeholder="Where purchased? (Amazon, Croma, Local Shop...)"
+                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
                           {PAYMENT_PLANS.map((plan) => (
                             <button
                               key={plan.id}
                               type="button"
-                              onClick={() => {
-                                setFormPaymentPlan(plan.id);
-                                if (plan.id === 'EMI') {
-                                  setFormMode('Credit Card');
-                                }
-                              }}
-                              className={`h-10 rounded-xl text-xs font-extrabold transition-colors ${
+                              onClick={() => setFormPaymentPlan(plan.id)}
+                              className={`h-10 rounded-xl text-xs font-extrabold border ${
                                 formPaymentPlan === plan.id
-                                  ? 'bg-cyan-600 text-white shadow-xs'
-                                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                                  ? 'bg-cyan-600 text-white border-cyan-600'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                               }`}
                             >
                               {plan.label}
                             </button>
                           ))}
                         </div>
-
                         {formPaymentPlan === 'EMI' && (
                           <input
                             type="text"
                             value={formEmiDetails}
                             onChange={(e) => setFormEmiDetails(e.target.value)}
-                            placeholder="EMI details (e.g. 6 Months No-Cost EMI • ₹4,500/mo)"
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-cyan-500/40 text-xs font-bold"
+                            placeholder="EMI details (e.g. 6 Months @ ₹3,500/mo, HDFC Card)"
+                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                           />
                         )}
-
-                        <div className="space-y-1 pt-0.5">
-                          <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 block">
-                            Warranty Coverage:
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-extrabold text-cyan-700 dark:text-cyan-300 block">
+                            Warranty Coverage
                           </span>
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                             {WARRANTY_OPTIONS.map((wOpt) => (
                               <button
                                 key={wOpt}
                                 type="button"
                                 onClick={() => setFormWarrantyPeriod(wOpt)}
-                                className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
+                                className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold shrink-0 border ${
                                   formWarrantyPeriod === wOpt
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                    ? 'bg-cyan-600 text-white border-cyan-600'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                                 }`}
                               >
                                 {wOpt}
@@ -3784,13 +4033,13 @@ export default function App() {
                       </div>
                     ) : (
                       <>
-                        <div className="grid grid-cols-2 gap-1.5">
+                        <div className="grid grid-cols-4 gap-1.5">
                           {COST_TYPES.map((ct) => (
                             <button
                               key={ct.id}
                               type="button"
                               onClick={() => setFormCostType(ct.id)}
-                              className={`h-9 rounded-xl text-xs font-extrabold border ${
+                              className={`h-9 rounded-xl text-[11px] font-extrabold border ${
                                 formCostType === ct.id
                                   ? 'bg-orange-600 text-white border-orange-600'
                                   : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
@@ -3801,48 +4050,49 @@ export default function App() {
                           ))}
                         </div>
 
-                        <div className="space-y-1.5">
-                          <input
-                            type="text"
-                            value={formVendor}
-                            onChange={(e) => setFormVendor(e.target.value)}
-                            placeholder="Vendor / Shop name"
-                            className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                          />
-                          {savedBillVendorSuggestions.length > 0 && (
-                            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                              {savedBillVendorSuggestions.map((vName) => (
-                                <button
-                                  key={vName}
-                                  type="button"
-                                  onClick={() => setFormVendor(vName)}
-                                  className={`h-7 px-2.5 rounded-full text-[11px] font-extrabold shrink-0 ${
-                                    formVendor === vName
-                                      ? 'bg-indigo-600 text-white'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                  }`}
-                                >
-                                  {vName}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        {savedBillVendorSuggestions.length > 0 && (
+                          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                            {savedBillVendorSuggestions.map((vName) => (
+                              <button
+                                key={vName}
+                                type="button"
+                                onClick={() => setFormVendor(vName)}
+                                className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold shrink-0 border ${
+                                  formVendor === vName
+                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                }`}
+                              >
+                                {vName}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </>
                     )}
 
                     <div className="grid grid-cols-2 gap-2">
-                      <select
-                        value={formPaidBy}
-                        onChange={(e) => setFormPaidBy(e.target.value)}
-                        className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                      >
-                        {FAMILY_MEMBERS.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            By {m.label}
-                          </option>
-                        ))}
-                      </select>
+                      {formCategory !== 'appliances' ? (
+                        <input
+                          type="text"
+                          value={formVendor}
+                          onChange={(e) => setFormVendor(e.target.value)}
+                          placeholder="Vendor / Contractor name"
+                          className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                      ) : (
+                        <select
+                          value={formPaidBy}
+                          onChange={(e) => setFormPaidBy(e.target.value)}
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        >
+                          {FAMILY_MEMBERS.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              By {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <input
                         type="date"
                         value={formDate}
@@ -3853,7 +4103,7 @@ export default function App() {
 
                     <label className="flex items-center justify-center gap-2 h-11 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-extrabold text-slate-500 cursor-pointer">
                       <CameraIcon className="w-4 h-4 text-indigo-600" />
-                      <span>{formReceipt ? 'Bill / Warranty Photo Attached ✓' : 'Attach Bill / Warranty Photo'}</span>
+                      <span>{formReceipt ? 'Bill Photo Attached ✓' : 'Attach Bill / Warranty Photo'}</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -3876,7 +4126,7 @@ export default function App() {
 
           {/* ================= ADD VENDOR MODAL ================= */}
           {isVendorModalOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
               <form
                 onSubmit={handleAddVendor}
                 className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-3.5"
@@ -3903,7 +4153,7 @@ export default function App() {
                   type="text"
                   value={newVendorTrade}
                   onChange={(e) => setNewVendorTrade(e.target.value)}
-                  placeholder="Work Scope (e.g. False Ceiling, Electrician)"
+                  placeholder="Trade (e.g. False Ceiling, Plumber, Electrician)"
                   className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                 />
                 <div className="grid grid-cols-2 gap-2">
@@ -3955,54 +4205,38 @@ export default function App() {
             </div>
           )}
 
-          {/* ================= GRAPHICAL PDF & CSV EXPORT CENTER MODAL ================= */}
+          {/* ================= REPORT EXPORT MODAL ================= */}
           {isExportModalOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                      Graphical PDF &amp; Spreadsheet
+                      Download Statements
                     </span>
-                    <h3 className="text-lg font-black">Export Report</h3>
+                    <h3 className="text-lg font-black">Export Interior &amp; Majuri Report</h3>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(false)}
-                    className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+                    className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
                   >
                     <XIcon className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 p-4 space-y-3.5">
-                  <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-3.5 flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-100">
-                        HomeLedger Graphical PDF
-                      </div>
-                      <div className="text-base font-black">Interior &amp; Majuri Statement</div>
-                    </div>
-                    <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-white/20">
-                      {analytics.billCount} Bills
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-400">Total Spent</span>
+                    <span className="font-black text-indigo-600 dark:text-indigo-400">
+                      {formatINR(analytics.totalSpent)}
                     </span>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
-                      <span className="text-[10px] font-bold text-indigo-500 block">Spent</span>
-                      <span className="text-xs font-black">{formatINR(analytics.totalSpent, true)}</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
-                      <span className="text-[10px] font-bold text-emerald-500 block">Paid / Adv</span>
-                      <span className="text-xs font-black">
-                        {formatINR(analytics.paidAmount + analytics.advanceAmount, true)}
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
-                      <span className="text-[10px] font-bold text-rose-500 block">Majuri</span>
-                      <span className="text-xs font-black">{formatINR(majuriSummary.totalWorkBill, true)}</span>
-                    </div>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-400">Carpentry Majuri Work</span>
+                    <span className="font-black text-orange-600">
+                      {formatINR(majuriSummary.totalWorkBill)} ({majuriSummary.totalSqft} ft²)
+                    </span>
                   </div>
                 </div>
 
@@ -4010,7 +4244,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handlePrintGraphicalPDF}
-                    className="h-13 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 active:scale-[0.98] transition-all"
+                    className="h-13 rounded-2xl bg-indigo-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25"
                   >
                     <PrinterIcon className="w-4 h-4" />
                     <span>Save PDF</span>
@@ -4019,10 +4253,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleExportCSV}
-                    className="h-13 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all"
+                    className="h-13 rounded-2xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
                   >
                     <SpreadsheetIcon className="w-4 h-4" />
-                    <span>Download CSV</span>
+                    <span>Excel CSV</span>
                   </button>
                 </div>
               </div>
