@@ -538,7 +538,7 @@ const INTERIOR_CATEGORIES: CategoryItem[] = [
     id: 'appliances',
     label: 'Appliances Shopping',
     shortLabel: 'Appliances',
-    subtitle: 'Fan, stove, chimney (Full / EMI + Warranty)',
+    subtitle: 'Fan, stove, chimney (Full / EMI)',
     defaultCostType: 'Material',
     presets: [
       { label: 'Ceiling / Exhaust Fan', costType: 'Material' },
@@ -784,7 +784,7 @@ export default function App() {
   const [formCostType, setFormCostType] = useState<string>('Material');
   const [formPaymentPlan, setFormPaymentPlan] = useState<string>('Full Payment');
   const [formEmiDetails, setFormEmiDetails] = useState<string>('');
-  const [formWarrantyPeriod, setFormWarrantyPeriod] = useState<string>('1 Year');
+  const [formWarrantyPeriod, setFormWarrantyPeriod] = useState<string>('No Warranty');
   const [formPaidBy, setFormPaidBy] = useState<string>('You');
   const [formTitle, setFormTitle] = useState<string>('');
   const [formVendor, setFormVendor] = useState<string>('');
@@ -917,7 +917,6 @@ export default function App() {
         const fbApp = getApps().length ? getApps()[0] : initializeApp(config);
         const fbAuth = authMod.getAuth(fbApp);
 
-        // Enable multi-tab IndexedDB persistent offline cache so poor site signal never loses data
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let fbDb: any;
         try {
@@ -941,7 +940,6 @@ export default function App() {
           setDoc: firestoreMod.setDoc
         });
 
-        // Handle redirect return on mobile browsers if popup fell back to redirect
         await authMod.getRedirectResult(fbAuth).catch(() => {});
 
         const win = window as unknown as { __initial_auth_token?: string };
@@ -1321,7 +1319,7 @@ export default function App() {
     setFormCostType(prefill.costType || targetCat.defaultCostType);
     setFormPaymentPlan(prefill.paymentPlan || 'Full Payment');
     setFormEmiDetails(prefill.emiDetails || '');
-    setFormWarrantyPeriod(prefill.warrantyPeriod || '1 Year');
+    setFormWarrantyPeriod(prefill.warrantyPeriod || 'No Warranty');
     setFormPaidBy(prefill.paidBy || 'You');
     setFormTitle(prefill.title || '');
     setFormVendor(prefill.vendor || '');
@@ -1334,13 +1332,14 @@ export default function App() {
     );
     setFormNotes(prefill.notes || '');
     setFormReceipt(prefill.receipt || null);
+    // Keep extra details smartly collapsed by default unless editing an entry that already has them
     setShowMoreBillFields(
       Boolean(
         prefill.vendor ||
           prefill.receipt ||
           prefill.notes ||
           prefill.paymentPlan === 'EMI' ||
-          targetCatId === 'appliances'
+          (prefill.warrantyPeriod && prefill.warrantyPeriod !== 'No Warranty')
       )
     );
     setIsAddDrawerOpen(true);
@@ -1350,9 +1349,6 @@ export default function App() {
     const cat = findCategoryById(catId);
     setFormCategory(catId);
     setFormCostType(cat.defaultCostType);
-    if (catId === 'appliances') {
-      setShowMoreBillFields(true);
-    }
   };
 
   const handleQuickAddAmount = (delta: number) => {
@@ -3654,93 +3650,6 @@ export default function App() {
                   className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                 />
 
-                {/* Appliances Shopping: Store / Source, Full Payment vs. EMI & Warranty */}
-                {formCategory === 'appliances' && (
-                  <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 space-y-2.5">
-                    <div className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
-                      Store / Source, Payment Plan &amp; Warranty
-                    </div>
-                    <input
-                      type="text"
-                      value={formVendor}
-                      onChange={(e) => setFormVendor(e.target.value)}
-                      placeholder="Where did you purchase? (e.g. Croma, Amazon, Local Store)"
-                      className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                    />
-                    <div className="flex flex-wrap gap-1.5">
-                      {PURCHASE_SOURCE_SUGGESTIONS.map((store) => (
-                        <button
-                          key={store}
-                          type="button"
-                          onClick={() => setFormVendor(store)}
-                          className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
-                            formVendor === store
-                              ? 'bg-cyan-600 text-white'
-                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                          }`}
-                        >
-                          {store}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-1.5 pt-1">
-                      {PAYMENT_PLANS.map((plan) => (
-                        <button
-                          key={plan.id}
-                          type="button"
-                          onClick={() => {
-                            setFormPaymentPlan(plan.id);
-                            if (plan.id === 'EMI') {
-                              setFormMode('Credit Card');
-                            }
-                          }}
-                          className={`h-10 rounded-xl text-xs font-extrabold transition-colors ${
-                            formPaymentPlan === plan.id
-                              ? 'bg-cyan-600 text-white shadow-xs'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
-                          }`}
-                        >
-                          {plan.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {formPaymentPlan === 'EMI' && (
-                      <input
-                        type="text"
-                        value={formEmiDetails}
-                        onChange={(e) => setFormEmiDetails(e.target.value)}
-                        placeholder="EMI details (e.g. 6 Months No-Cost EMI • ₹4,500/mo)"
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-cyan-500/40 text-xs font-bold"
-                      />
-                    )}
-
-                    {/* Warranty Period Quick Pills */}
-                    <div className="space-y-1 pt-0.5">
-                      <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 block">
-                        Warranty Coverage:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {WARRANTY_OPTIONS.map((wOpt) => (
-                          <button
-                            key={wOpt}
-                            type="button"
-                            onClick={() => setFormWarrantyPeriod(wOpt)}
-                            className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
-                              formWarrantyPeriod === wOpt
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                            }`}
-                          >
-                            {wOpt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Duplicate Bill Guard Alert */}
                 {duplicateBillWarning && (
                   <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-800 dark:text-amber-200">
@@ -3775,62 +3684,151 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Collapsible Optional Details Toggle */}
+                {/* Collapsible Extra Details Toggle (Hidden by default for a clean 3-tap UI) */}
                 <button
                   type="button"
                   onClick={() => setShowMoreBillFields(!showMoreBillFields)}
                   className="w-full h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-extrabold text-slate-600 dark:text-slate-300"
                 >
-                  {showMoreBillFields ? '− Hide Extra Details' : '+ Vendor, Type, Date & Bill Photo'}
+                  {showMoreBillFields
+                    ? '− Hide Extra Details'
+                    : formCategory === 'appliances'
+                    ? '+ Store, EMI, Warranty & Bill Photo'
+                    : '+ Vendor, Type, Date & Bill Photo'}
                 </button>
 
                 {showMoreBillFields && (
                   <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {COST_TYPES.map((ct) => (
-                        <button
-                          key={ct.id}
-                          type="button"
-                          onClick={() => setFormCostType(ct.id)}
-                          className={`h-9 rounded-xl text-xs font-extrabold border ${
-                            formCostType === ct.id
-                              ? 'bg-orange-600 text-white border-orange-600'
-                              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          {ct.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {formCategory !== 'appliances' && (
-                      <div className="space-y-1.5">
+                    {formCategory === 'appliances' ? (
+                      <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 space-y-2.5">
+                        <div className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+                          Store / Source, Payment Plan &amp; Warranty
+                        </div>
                         <input
                           type="text"
                           value={formVendor}
                           onChange={(e) => setFormVendor(e.target.value)}
-                          placeholder="Vendor / Shop name"
-                          className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                          placeholder="Where did you purchase? (e.g. Croma, Amazon, Local Store)"
+                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                         />
-                        {savedBillVendorSuggestions.length > 0 && (
-                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                            {savedBillVendorSuggestions.map((vName) => (
+                        <div className="flex flex-wrap gap-1.5">
+                          {PURCHASE_SOURCE_SUGGESTIONS.map((store) => (
+                            <button
+                              key={store}
+                              type="button"
+                              onClick={() => setFormVendor(store)}
+                              className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
+                                formVendor === store
+                                  ? 'bg-cyan-600 text-white'
+                                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {store}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          {PAYMENT_PLANS.map((plan) => (
+                            <button
+                              key={plan.id}
+                              type="button"
+                              onClick={() => {
+                                setFormPaymentPlan(plan.id);
+                                if (plan.id === 'EMI') {
+                                  setFormMode('Credit Card');
+                                }
+                              }}
+                              className={`h-10 rounded-xl text-xs font-extrabold transition-colors ${
+                                formPaymentPlan === plan.id
+                                  ? 'bg-cyan-600 text-white shadow-xs'
+                                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {plan.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {formPaymentPlan === 'EMI' && (
+                          <input
+                            type="text"
+                            value={formEmiDetails}
+                            onChange={(e) => setFormEmiDetails(e.target.value)}
+                            placeholder="EMI details (e.g. 6 Months No-Cost EMI • ₹4,500/mo)"
+                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-cyan-500/40 text-xs font-bold"
+                          />
+                        )}
+
+                        <div className="space-y-1 pt-0.5">
+                          <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 block">
+                            Warranty Coverage:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {WARRANTY_OPTIONS.map((wOpt) => (
                               <button
-                                key={vName}
+                                key={wOpt}
                                 type="button"
-                                onClick={() => setFormVendor(vName)}
-                                className={`h-7 px-2.5 rounded-full text-[11px] font-extrabold shrink-0 ${
-                                  formVendor === vName
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                onClick={() => setFormWarrantyPeriod(wOpt)}
+                                className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
+                                  formWarrantyPeriod === wOpt
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                                 }`}
                               >
-                                {vName}
+                                {wOpt}
                               </button>
                             ))}
                           </div>
-                        )}
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {COST_TYPES.map((ct) => (
+                            <button
+                              key={ct.id}
+                              type="button"
+                              onClick={() => setFormCostType(ct.id)}
+                              className={`h-9 rounded-xl text-xs font-extrabold border ${
+                                formCostType === ct.id
+                                  ? 'bg-orange-600 text-white border-orange-600'
+                                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              {ct.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={formVendor}
+                            onChange={(e) => setFormVendor(e.target.value)}
+                            placeholder="Vendor / Shop name"
+                            className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                          />
+                          {savedBillVendorSuggestions.length > 0 && (
+                            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                              {savedBillVendorSuggestions.map((vName) => (
+                                <button
+                                  key={vName}
+                                  type="button"
+                                  onClick={() => setFormVendor(vName)}
+                                  className={`h-7 px-2.5 rounded-full text-[11px] font-extrabold shrink-0 ${
+                                    formVendor === vName
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {vName}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
 
                     <div className="grid grid-cols-2 gap-2">
