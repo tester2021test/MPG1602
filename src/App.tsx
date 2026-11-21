@@ -45,6 +45,15 @@ const getFirebaseConfig = (): FirebaseConfigType | null => {
   return null;
 };
 
+// --- Detect In-App Embedded WebViews (WhatsApp, Instagram, Facebook) where Google OAuth is blocked ---
+const detectInAppBrowser = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|MicroMessenger|BytedanceWebview|musical_ly|KAKAOTALK|Barcelona|; wv\)/i.test(
+    ua
+  );
+};
+
 // --- Self-Contained Crisp Inline SVG Icons ---
 interface IconProps {
   className?: string;
@@ -322,6 +331,13 @@ const ZapIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
   </svg>
 );
 
+const ShieldCheckIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
 // --- Native Responsive SVG Donut Chart ---
 interface DonutSlice {
   name: string;
@@ -522,7 +538,7 @@ const INTERIOR_CATEGORIES: CategoryItem[] = [
     id: 'appliances',
     label: 'Appliances Shopping',
     shortLabel: 'Appliances',
-    subtitle: 'Fan, stove, chimney (Full / EMI + Store)',
+    subtitle: 'Fan, stove, chimney (Full / EMI + Warranty)',
     defaultCostType: 'Material',
     presets: [
       { label: 'Ceiling / Exhaust Fan', costType: 'Material' },
@@ -551,6 +567,8 @@ const PAYMENT_PLANS = [
   { id: 'Full Payment', label: 'Full Payment' },
   { id: 'EMI', label: 'On EMI' }
 ];
+
+const WARRANTY_OPTIONS = ['No Warranty', '1 Year', '2 Years', '5 Years', '10 Years'];
 
 const PURCHASE_SOURCE_SUGGESTIONS = [
   'Amazon',
@@ -644,6 +662,7 @@ interface ExpenseItem {
   costType?: string;
   paymentPlan?: string;
   emiDetails?: string;
+  warrantyPeriod?: string;
   paidBy?: string;
   vendor: string;
   mode: string;
@@ -739,6 +758,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+  const [isInAppWebView] = useState<boolean>(() => detectInAppBrowser());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [fbRuntime, setFbRuntime] = useState<any>(null);
   const [hasFirebaseConfig] = useState<boolean>(() => Boolean(getFirebaseConfig()));
@@ -764,6 +784,7 @@ export default function App() {
   const [formCostType, setFormCostType] = useState<string>('Material');
   const [formPaymentPlan, setFormPaymentPlan] = useState<string>('Full Payment');
   const [formEmiDetails, setFormEmiDetails] = useState<string>('');
+  const [formWarrantyPeriod, setFormWarrantyPeriod] = useState<string>('1 Year');
   const [formPaidBy, setFormPaidBy] = useState<string>('You');
   const [formTitle, setFormTitle] = useState<string>('');
   const [formVendor, setFormVendor] = useState<string>('');
@@ -874,7 +895,7 @@ export default function App() {
     };
   }, []);
 
-  // --- Firebase Authentication Initialization ---
+  // --- Firebase Authentication & Offline IndexedDB Cache Initialization ---
   useEffect(() => {
     const config = getFirebaseConfig();
     if (!config) {
@@ -895,17 +916,33 @@ export default function App() {
 
         const fbApp = getApps().length ? getApps()[0] : initializeApp(config);
         const fbAuth = authMod.getAuth(fbApp);
-        const fbDb = firestoreMod.getFirestore(fbApp);
+
+        // Enable multi-tab IndexedDB persistent offline cache so poor site signal never loses data
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let fbDb: any;
+        try {
+          fbDb = firestoreMod.initializeFirestore(fbApp, {
+            localCache: firestoreMod.persistentLocalCache({
+              tabManager: firestoreMod.persistentMultipleTabManager()
+            })
+          });
+        } catch {
+          fbDb = firestoreMod.getFirestore(fbApp);
+        }
 
         setFbRuntime({
           auth: fbAuth,
           db: fbDb,
           GoogleAuthProvider: authMod.GoogleAuthProvider,
           signInWithPopup: authMod.signInWithPopup,
+          signInWithRedirect: authMod.signInWithRedirect,
           signOut: authMod.signOut,
           doc: firestoreMod.doc,
           setDoc: firestoreMod.setDoc
         });
+
+        // Handle redirect return on mobile browsers if popup fell back to redirect
+        await authMod.getRedirectResult(fbAuth).catch(() => {});
 
         const win = window as unknown as { __initial_auth_token?: string };
         if (typeof win.__initial_auth_token !== 'undefined' && win.__initial_auth_token) {
@@ -1062,9 +1099,16 @@ export default function App() {
         return;
       }
       showToast(`Welcome back, ${ALLOWED_EMAIL}!`);
-    } catch (err) {
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'auth/popup-blocked' && fbRuntime.signInWithRedirect) {
+        const provider = new fbRuntime.GoogleAuthProvider();
+        provider.setCustomParameters({ login_hint: ALLOWED_EMAIL });
+        await fbRuntime.signInWithRedirect(fbRuntime.auth, provider).catch(() => {});
+        return;
+      }
       console.warn('Google sign-in failed:', err);
-      setAuthError('Sign-in cancelled or blocked by browser pop-up settings.');
+      setAuthError('Sign-in cancelled or blocked. If inside WhatsApp/Instagram, open in Chrome or Safari.');
     }
   };
 
@@ -1277,6 +1321,7 @@ export default function App() {
     setFormCostType(prefill.costType || targetCat.defaultCostType);
     setFormPaymentPlan(prefill.paymentPlan || 'Full Payment');
     setFormEmiDetails(prefill.emiDetails || '');
+    setFormWarrantyPeriod(prefill.warrantyPeriod || '1 Year');
     setFormPaidBy(prefill.paidBy || 'You');
     setFormTitle(prefill.title || '');
     setFormVendor(prefill.vendor || '');
@@ -1349,6 +1394,7 @@ export default function App() {
       paymentPlan: formCategory === 'appliances' ? formPaymentPlan : 'Full Payment',
       emiDetails:
         formCategory === 'appliances' && formPaymentPlan === 'EMI' ? formEmiDetails.trim() : '',
+      warrantyPeriod: formCategory === 'appliances' ? formWarrantyPeriod : '',
       paidBy: formPaidBy,
       vendor: cleanVendor,
       mode: formMode,
@@ -2032,7 +2078,7 @@ export default function App() {
                   <th>Section</th>
                   <th>Type</th>
                   <th>Store / Vendor</th>
-                  <th>Payment Plan</th>
+                  <th>Payment Plan &amp; Warranty</th>
                   <th>Mode</th>
                   <th>Status</th>
                   <th style="text-align:right;">Amount</th>
@@ -2047,6 +2093,7 @@ export default function App() {
                       e.paymentPlan === 'EMI'
                         ? `EMI${e.emiDetails ? ` (${e.emiDetails})` : ''}`
                         : 'Full';
+                    const warStr = e.warrantyPeriod && e.warrantyPeriod !== 'No Warranty' ? ` • ${e.warrantyPeriod} Warranty` : '';
                     return `
                       <tr>
                         <td>${e.date}</td>
@@ -2054,7 +2101,7 @@ export default function App() {
                         <td>${catLabel}</td>
                         <td>${e.costType || 'Material'}</td>
                         <td>${e.vendor}</td>
-                        <td>${planStr}</td>
+                        <td>${planStr}${warStr}</td>
                         <td>${e.mode}</td>
                         <td><span class="pill ${stClass}">${e.status}</span></td>
                         <td style="text-align:right; font-weight:800;">${formatINR(e.amount)}</td>
@@ -2081,7 +2128,7 @@ export default function App() {
 
   // --- 1-Click CSV / Excel Report Export ---
   const handleExportCSV = () => {
-    const headers = ['Date', 'Title', 'Trade / Section', 'Type', 'Paid By', 'Store / Vendor', 'Payment Plan', 'EMI Details', 'Amount (INR)', 'Payment Mode', 'Status', 'Notes'];
+    const headers = ['Date', 'Title', 'Trade / Section', 'Type', 'Paid By', 'Store / Vendor', 'Payment Plan', 'EMI Details', 'Warranty', 'Amount (INR)', 'Payment Mode', 'Status', 'Notes'];
     const rows = (currentProject.expenses || []).map((e) => {
       const catLabel = findCategoryById(e.category).label;
       return [
@@ -2093,6 +2140,7 @@ export default function App() {
         `"${(e.vendor || '').replace(/"/g, '""')}"`,
         e.paymentPlan || 'Full Payment',
         `"${(e.emiDetails || '').replace(/"/g, '""')}"`,
+        `"${e.warrantyPeriod || ''}"`,
         e.amount,
         e.mode,
         e.status,
@@ -2170,6 +2218,24 @@ export default function App() {
                   Sign in with your authorized Google account to access your private home interior bills &amp; carpentry khata.
                 </p>
               </div>
+
+              {isInAppWebView && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-xs font-bold text-amber-800 dark:text-amber-200 text-left space-y-2">
+                  <p>
+                    You opened this link inside an in-app browser (WhatsApp/Instagram). Google blocks sign-in inside in-app browsers—open in <strong>Chrome</strong> or <strong>Safari</strong> first.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(window.location.href).catch(() => {});
+                      showToast('Link copied — paste in Chrome or Safari');
+                    }}
+                    className="h-9 px-3 rounded-xl bg-amber-600 text-white text-[11px] font-extrabold"
+                  >
+                    Copy Link for Chrome / Safari
+                  </button>
+                </div>
+              )}
 
               {authError && (
                 <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs font-extrabold text-rose-600 dark:text-rose-400 text-left">
@@ -2249,7 +2315,7 @@ export default function App() {
                   <div className="flex items-center gap-1.5 mt-1">
                     {!isOnline || syncStatus === 'offline' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                        <CloudOffIcon className="w-3 h-3" /> Offline
+                        <CloudOffIcon className="w-3 h-3" /> Offline Cached
                       </span>
                     ) : syncStatus === 'synced' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -2701,6 +2767,12 @@ export default function App() {
                               {exp.paymentPlan === 'EMI' && (
                                 <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-extrabold">
                                   EMI{exp.emiDetails ? ` • ${exp.emiDetails}` : ''}
+                                </span>
+                              )}
+                              {exp.warrantyPeriod && exp.warrantyPeriod !== 'No Warranty' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-extrabold">
+                                  <ShieldCheckIcon className="w-3 h-3" />
+                                  {exp.warrantyPeriod}
                                 </span>
                               )}
                             </div>
@@ -3582,11 +3654,11 @@ export default function App() {
                   className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
                 />
 
-                {/* Appliances Shopping: Store / Source & Full Payment vs. EMI Selector */}
+                {/* Appliances Shopping: Store / Source, Full Payment vs. EMI & Warranty */}
                 {formCategory === 'appliances' && (
                   <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 space-y-2.5">
                     <div className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
-                      Appliance Purchase Source &amp; Payment Plan
+                      Store / Source, Payment Plan &amp; Warranty
                     </div>
                     <input
                       type="text"
@@ -3643,6 +3715,29 @@ export default function App() {
                         className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-cyan-500/40 text-xs font-bold"
                       />
                     )}
+
+                    {/* Warranty Period Quick Pills */}
+                    <div className="space-y-1 pt-0.5">
+                      <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-300 block">
+                        Warranty Coverage:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {WARRANTY_OPTIONS.map((wOpt) => (
+                          <button
+                            key={wOpt}
+                            type="button"
+                            onClick={() => setFormWarrantyPeriod(wOpt)}
+                            className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
+                              formWarrantyPeriod === wOpt
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            {wOpt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -3760,7 +3855,7 @@ export default function App() {
 
                     <label className="flex items-center justify-center gap-2 h-11 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-extrabold text-slate-500 cursor-pointer">
                       <CameraIcon className="w-4 h-4 text-indigo-600" />
-                      <span>{formReceipt ? 'Bill Photo Attached ✓' : 'Attach Bill Photo'}</span>
+                      <span>{formReceipt ? 'Bill / Warranty Photo Attached ✓' : 'Attach Bill / Warranty Photo'}</span>
                       <input
                         type="file"
                         accept="image/*"

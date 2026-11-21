@@ -1,0 +1,3942 @@
+import React, { useState, useEffect, useMemo } from 'react';
+
+// --- Authorized Owner Email (Strict Single-User Access Control) ---
+const ALLOWED_EMAIL = 'vivekdn2504@gmail.com';
+const appId =
+  typeof (window as unknown as { __app_id?: string }).__app_id !== 'undefined'
+    ? (window as unknown as { __app_id: string }).__app_id
+    : 'home-renovation-manager';
+
+interface FirebaseConfigType {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+}
+
+const getFirebaseConfig = (): FirebaseConfigType | null => {
+  try {
+    const win = window as unknown as { __firebase_config?: string };
+    if (typeof win.__firebase_config !== 'undefined' && win.__firebase_config) {
+      return JSON.parse(win.__firebase_config) as FirebaseConfigType;
+    }
+  } catch (err) {
+    console.warn('Firebase window config check skipped:', err);
+  }
+
+  try {
+    const env = (import.meta as unknown as { env?: Record<string, string> }).env;
+    if (env?.VITE_FIREBASE_API_KEY) {
+      return {
+        apiKey: env.VITE_FIREBASE_API_KEY,
+        authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: env.VITE_FIREBASE_APP_ID
+      };
+    }
+  } catch (err) {
+    console.warn('Firebase env check skipped:', err);
+  }
+
+  return null;
+};
+
+// --- Self-Contained Crisp Inline SVG Icons ---
+interface IconProps {
+  className?: string;
+}
+
+const HomeIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 10.5L12 3l9 7.5" />
+    <path d="M5 9.5V19a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+  </svg>
+);
+
+const SunIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+  </svg>
+);
+
+const MoonIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+  </svg>
+);
+
+const CloudIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+  </svg>
+);
+
+const CloudOffIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m2 2 20 20" />
+    <path d="M17.5 19H9a7 7 0 0 1-5.66-11.15" />
+    <path d="M10.6 5A7 7 0 0 1 18 12.6" />
+  </svg>
+);
+
+const LogInIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+    <polyline points="10 17 15 12 10 7" />
+    <line x1="15" x2="3" y1="12" y2="12" />
+  </svg>
+);
+
+const LogOutIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" x2="9" y1="12" y2="12" />
+  </svg>
+);
+
+const CheckCircleIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+const ArrowUpRightIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M7 7h10v10" />
+    <path d="M7 17 17 7" />
+  </svg>
+);
+
+const PlusIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </svg>
+);
+
+const SearchIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </svg>
+);
+
+const TrashIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+
+const EditIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 20h9" />
+    <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.837a.5.5 0 0 1-.62-.62l.837-2.872a2 2 0 0 1 .506-.854z" />
+  </svg>
+);
+
+const CopyIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </svg>
+);
+
+const ImageIcon: React.FC<IconProps> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+    <circle cx="9" cy="9" r="2" />
+    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+  </svg>
+);
+
+const ReceiptIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+    <path d="M8 7h8" />
+    <path d="M8 11h8" />
+    <path d="M8 15h5" />
+  </svg>
+);
+
+const LayoutGridIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="7" height="7" x="3" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="14" rx="1" />
+    <rect width="7" height="7" x="3" y="14" rx="1" />
+  </svg>
+);
+
+const RulerIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
+    <path d="m14.5 12.5 2-2" />
+    <path d="m11.5 9.5 2-2" />
+    <path d="m8.5 6.5 2-2" />
+    <path d="m17.5 15.5 2-2" />
+  </svg>
+);
+
+const HardHatIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z" />
+    <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" />
+    <path d="M4 15v-3a6 6 0 0 1 6-6h0" />
+    <path d="M14 6h0a6 6 0 0 1 6 6v3" />
+  </svg>
+);
+
+const PrinterIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <path d="M6 9V3h12v6" />
+    <rect width="12" height="8" x="6" y="14" />
+  </svg>
+);
+
+const SpreadsheetIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+    <path d="M8 13h8" />
+    <path d="M8 17h8" />
+    <path d="M12 9v11" />
+  </svg>
+);
+
+const XIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
+
+const CameraIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+    <circle cx="12" cy="13" r="3" />
+  </svg>
+);
+
+const SofaIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
+    <path d="M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H6v-2a2 2 0 0 0-4 0Z" />
+    <path d="M4 18v2" />
+    <path d="M20 18v2" />
+  </svg>
+);
+
+const KitchenIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z" />
+    <line x1="6" x2="18" y1="17" y2="17" />
+  </svg>
+);
+
+const BookOpenIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 7v14" />
+    <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+  </svg>
+);
+
+const BedIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M2 4v16" />
+    <path d="M2 8h18a2 2 0 0 1 2 2v10" />
+    <path d="M2 17h20" />
+    <path d="M6 8v9" />
+  </svg>
+);
+
+const DoorIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M13 4h3a2 2 0 0 1 2 2v14" />
+    <path d="M2 20h3" />
+    <path d="M13 12h.01" />
+    <path d="M5 20V4a2 2 0 0 1 2-2h6v18" />
+  </svg>
+);
+
+const LayersIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+    <path d="m2 12 8.58 3.91a2 2 0 0 0 1.66 0L21 12" />
+    <path d="m2 17 8.58 3.91a2 2 0 0 0 1.66 0L21 17" />
+  </svg>
+);
+
+const SparklesIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+  </svg>
+);
+
+const TvIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="20" height="15" x="2" y="7" rx="2" ry="2" />
+    <polyline points="17 2 12 7 7 2" />
+  </svg>
+);
+
+const DropletIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+  </svg>
+);
+
+const BrickWallIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M12 9v6" />
+    <path d="M16 15v6" />
+    <path d="M16 3v6" />
+    <path d="M3 15h18" />
+    <path d="M3 9h18" />
+    <path d="M8 15v6" />
+    <path d="M8 3v6" />
+  </svg>
+);
+
+const PaintRollerIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect width="16" height="6" x="2" y="2" rx="2" />
+    <path d="M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+    <rect width="4" height="6" x="8" y="16" rx="1" />
+  </svg>
+);
+
+const ZapIcon: React.FC<IconProps> = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+  </svg>
+);
+
+// --- Native Responsive SVG Donut Chart ---
+interface DonutSlice {
+  name: string;
+  value: number;
+  color: string;
+}
+
+const NativeDonutChart: React.FC<{
+  data: DonutSlice[];
+  size?: number;
+  strokeWidth?: number;
+}> = ({ data, size = 148, strokeWidth = 20 }) => {
+  const total = data.reduce((sum, item) => sum + Math.max(0, Number(item.value) || 0), 0);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const center = size / 2;
+
+  if (!total || data.length === 0) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="text-slate-200 dark:text-slate-700">
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} />
+      </svg>
+    );
+  }
+
+  let accumulatedLength = 0;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+      <circle
+        cx={center}
+        cy={center}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        className="text-slate-100 dark:text-slate-800"
+      />
+      {data.map((slice) => {
+        const val = Math.max(0, Number(slice.value) || 0);
+        const segLen = (val / total) * circumference;
+        const dashOffset = -accumulatedLength;
+        accumulatedLength += segLen;
+        return (
+          <circle
+            key={slice.name}
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke={slice.color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${segLen} ${circumference}`}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+// --- Indian Currency Formatter ---
+const formatINR = (amount: number | string, compact = false): string => {
+  const num = Number(amount) || 0;
+  if (compact) {
+    if (Math.abs(num) >= 100000) {
+      return `₹${(num / 100000).toFixed(2).replace(/\.00$/, '')}L`;
+    }
+    if (Math.abs(num) >= 1000) {
+      return `₹${(num / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    }
+  }
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(num);
+};
+
+// --- Trade & Shopping Sections Configuration ---
+interface CategoryPreset {
+  label: string;
+  costType: 'Material' | 'Labour' | 'Turnkey' | 'Lumpsum';
+}
+
+interface CategoryItem {
+  id: string;
+  label: string;
+  shortLabel: string;
+  subtitle: string;
+  defaultCostType: 'Material' | 'Labour' | 'Turnkey' | 'Lumpsum';
+  presets: CategoryPreset[];
+  icon: React.FC<IconProps>;
+  color: string;
+  bg: string;
+  text: string;
+}
+
+const INTERIOR_CATEGORIES: CategoryItem[] = [
+  {
+    id: 'carpentry',
+    label: 'Carpentry & Woodwork',
+    shortLabel: 'Carpentry',
+    subtitle: 'Plywood, laminates & carpenter majuri',
+    defaultCostType: 'Material',
+    presets: [
+      { label: 'Plywood & Laminates', costType: 'Material' },
+      { label: 'Hardware & Fittings', costType: 'Material' },
+      { label: 'Main Carpenter Majuri', costType: 'Labour' }
+    ],
+    icon: LayersIcon,
+    color: '#d97706',
+    bg: 'bg-amber-500/15',
+    text: 'text-amber-600 dark:text-amber-400'
+  },
+  {
+    id: 'false_ceiling',
+    label: 'False Ceiling (With Material)',
+    shortLabel: 'False Ceiling',
+    subtitle: 'Complete turnkey work with material',
+    defaultCostType: 'Turnkey',
+    presets: [
+      { label: 'Complete False Ceiling (Work + Material)', costType: 'Turnkey' },
+      { label: 'POP / Gypsum Turnkey Installment', costType: 'Turnkey' },
+      { label: 'Cove & Profile Channel Work', costType: 'Turnkey' }
+    ],
+    icon: SparklesIcon,
+    color: '#8b5cf6',
+    bg: 'bg-violet-500/15',
+    text: 'text-violet-600 dark:text-violet-400'
+  },
+  {
+    id: 'plumbing',
+    label: 'Plumbing & Water Tank',
+    shortLabel: 'Plumbing',
+    subtitle: '1-time majuri, water tank & fittings',
+    defaultCostType: 'Material',
+    presets: [
+      { label: 'Plumbing One-Time Majuri', costType: 'Labour' },
+      { label: 'Water Tank Purchase', costType: 'Material' },
+      { label: 'Tank Installation & Pipe Accessories', costType: 'Material' }
+    ],
+    icon: DropletIcon,
+    color: '#0284c7',
+    bg: 'bg-sky-500/15',
+    text: 'text-sky-600 dark:text-sky-400'
+  },
+  {
+    id: 'civil',
+    label: 'Civil Work & Material',
+    shortLabel: 'Civil Work',
+    subtitle: '1-time majuri & 1-time civil material',
+    defaultCostType: 'Material',
+    presets: [
+      { label: 'Civil One-Time Majuri', costType: 'Labour' },
+      { label: 'One-Time Civil Material (Cement/Sand/Tiles)', costType: 'Material' },
+      { label: 'Granite / Kitchen Platform Material', costType: 'Material' }
+    ],
+    icon: BrickWallIcon,
+    color: '#e11d48',
+    bg: 'bg-rose-500/15',
+    text: 'text-rose-600 dark:text-rose-400'
+  },
+  {
+    id: 'painting',
+    label: 'Painting Service',
+    shortLabel: 'Painting',
+    subtitle: 'Lumpsum painting entry',
+    defaultCostType: 'Lumpsum',
+    presets: [
+      { label: 'Painting Service Lumpsum', costType: 'Lumpsum' },
+      { label: 'Putty, Primer & Paint Lumpsum', costType: 'Lumpsum' }
+    ],
+    icon: PaintRollerIcon,
+    color: '#10b981',
+    bg: 'bg-emerald-500/15',
+    text: 'text-emerald-600 dark:text-emerald-400'
+  },
+  {
+    id: 'electrician',
+    label: 'Electrician & Lights',
+    shortLabel: 'Electrician',
+    subtitle: 'Majuri, wires, plates/buttons & lights',
+    defaultCostType: 'Material',
+    presets: [
+      { label: 'Electrician Majuri', costType: 'Labour' },
+      { label: 'Wire Purchase', costType: 'Material' },
+      { label: 'Plates & Button Purchase', costType: 'Material' },
+      { label: 'Lights Purchase', costType: 'Material' }
+    ],
+    icon: ZapIcon,
+    color: '#f59e0b',
+    bg: 'bg-yellow-500/15',
+    text: 'text-yellow-600 dark:text-yellow-400'
+  },
+  {
+    id: 'appliances',
+    label: 'Appliances Shopping',
+    shortLabel: 'Appliances',
+    subtitle: 'Fan, stove, chimney (Full / EMI + Store)',
+    defaultCostType: 'Material',
+    presets: [
+      { label: 'Ceiling / Exhaust Fan', costType: 'Material' },
+      { label: 'Gas Stove / Hob', costType: 'Material' },
+      { label: 'Kitchen Chimney', costType: 'Material' }
+    ],
+    icon: TvIcon,
+    color: '#06b6d4',
+    bg: 'bg-cyan-500/15',
+    text: 'text-cyan-600 dark:text-cyan-400'
+  }
+];
+
+const findCategoryById = (catId: string): CategoryItem => {
+  return INTERIOR_CATEGORIES.find((c) => c.id === catId) || INTERIOR_CATEGORIES[0];
+};
+
+const COST_TYPES = [
+  { id: 'Material', label: 'Material' },
+  { id: 'Labour', label: 'Majuri / Labour' },
+  { id: 'Turnkey', label: 'With Material' },
+  { id: 'Lumpsum', label: 'Lumpsum' }
+];
+
+const PAYMENT_PLANS = [
+  { id: 'Full Payment', label: 'Full Payment' },
+  { id: 'EMI', label: 'On EMI' }
+];
+
+const PURCHASE_SOURCE_SUGGESTIONS = [
+  'Amazon',
+  'Flipkart',
+  'Croma',
+  'Reliance Digital',
+  'Vijay Sales',
+  'Local Store'
+];
+
+const FAMILY_MEMBERS = [
+  { id: 'You', label: 'You' },
+  { id: 'Spouse', label: 'Spouse' },
+  { id: 'Parents', label: 'Parents' },
+  { id: 'Supervisor', label: 'Site Sup.' }
+];
+
+const PAYMENT_MODES = [
+  { id: 'UPI', label: 'UPI', color: '#6366f1' },
+  { id: 'Bank Transfer', label: 'Bank/NEFT', color: '#0ea5e9' },
+  { id: 'Cash', label: 'Cash', color: '#10b981' },
+  { id: 'Credit Card', label: 'Card', color: '#f59e0b' }
+];
+
+const PAYMENT_STATUSES = [
+  { id: 'Paid', label: 'Paid', badgeBg: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
+  { id: 'Advance', label: 'Advance', badgeBg: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+  { id: 'Pending', label: 'Pending Due', badgeBg: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30' }
+];
+
+const MAJURI_ROOMS = [
+  { id: 'living', label: 'Living Room', shortLabel: 'Living', icon: SofaIcon, color: '#6366f1', bg: 'bg-indigo-500/15', text: 'text-indigo-600 dark:text-indigo-400' },
+  { id: 'kitchen', label: 'Kitchen', shortLabel: 'Kitchen', icon: KitchenIcon, color: '#f97316', bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-400' },
+  { id: 'study', label: 'Study Room', shortLabel: 'Study', icon: BookOpenIcon, color: '#06b6d4', bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400' },
+  { id: 'master_bedroom', label: 'Master Bedroom', shortLabel: 'Master Bed', icon: BedIcon, color: '#ec4899', bg: 'bg-pink-500/15', text: 'text-pink-600 dark:text-pink-400' },
+  { id: 'safety_shoe', label: 'Safety Door & Shoe Rack', shortLabel: 'Safety & Shoe', icon: DoorIcon, color: '#10b981', bg: 'bg-emerald-500/15', text: 'text-emerald-600 dark:text-emerald-400' }
+];
+
+const RATE_PRESETS = [300, 200, 150];
+const DEFAULT_CARPENTER_VENDOR = 'Main Carpenter';
+
+interface MajuriEntry {
+  id: string;
+  vendorName?: string;
+  roomId: string;
+  item: string;
+  unit: string;
+  qty?: number;
+  height: number;
+  width: number;
+  sqft: number;
+  rate: number;
+  amount: number;
+  date: string;
+}
+
+interface CarpenterAdvance {
+  id: string;
+  vendorName?: string;
+  syncedExpenseId?: string | null;
+  weekLabel: string;
+  amount: number;
+  mode: string;
+  paidBy: string;
+  date: string;
+  notes: string;
+}
+
+interface MilestoneItem {
+  id: string;
+  label: string;
+  amount: number;
+  dueDate: string;
+  status: string;
+}
+
+interface VendorItem {
+  id: string;
+  name: string;
+  trade: string;
+  quoted: number;
+  phone: string;
+  milestones: MilestoneItem[];
+}
+
+interface ExpenseItem {
+  id: string;
+  title: string;
+  amount: number;
+  category: string;
+  costType?: string;
+  paymentPlan?: string;
+  emiDetails?: string;
+  paidBy?: string;
+  vendor: string;
+  mode: string;
+  status: string;
+  date: string;
+  notes?: string;
+  receipt?: string | null;
+}
+
+interface ProjectData {
+  id: string;
+  name: string;
+  shortName: string;
+  vendors: VendorItem[];
+  expenses: ExpenseItem[];
+}
+
+const INITIAL_MAJURI_ENTRIES: MajuriEntry[] = [];
+const INITIAL_CARPENTER_ADVANCES: CarpenterAdvance[] = [];
+
+const INITIAL_PROJECTS: Record<string, ProjectData> = {
+  interior: {
+    id: 'interior',
+    name: 'Interior Work & Purchases',
+    shortName: 'Interiors',
+    vendors: [],
+    expenses: []
+  }
+};
+
+// --- Client-Side Image Compression Helper ---
+const compressReceiptImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 640;
+        const scale = Math.min(1, MAX_WIDTH / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        resolve(canvas.toDataURL('image/jpeg', 0.65));
+      };
+      img.onerror = reject;
+      img.src = String(event.target?.result || '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+export default function App() {
+  // --- Theme, Large Text & Navigation State ---
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('homeledger_theme') === 'dark';
+    } catch {
+      return false;
+    }
+  });
+  const [largeTextMode, setLargeTextMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('homeledger_large_text') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [showInstallTip, setShowInstallTip] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('homeledger_hide_install_tip') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [activeTab, setActiveTab] = useState<string>('overview');
+
+  // --- Core App Data State ---
+  const [projects, setProjects] = useState<Record<string, ProjectData>>(INITIAL_PROJECTS);
+  const [majuriEntries, setMajuriEntries] = useState<MajuriEntry[]>(INITIAL_MAJURI_ENTRIES);
+  const [carpenterAdvances, setCarpenterAdvances] = useState<CarpenterAdvance[]>(INITIAL_CARPENTER_ADVANCES);
+  const [selectedMajuriRoomFilter, setSelectedMajuriRoomFilter] = useState<string>('all');
+  const [selectedMajuriVendorFilter, setSelectedMajuriVendorFilter] = useState<string>('all');
+  const [majuriActionMode, setMajuriActionMode] = useState<'measure' | 'advance'>('measure');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [costTypeFilter, setCostTypeFilter] = useState<string>('all');
+
+  // --- Network & Firebase Auth / Workspace State ---
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [fbRuntime, setFbRuntime] = useState<any>(null);
+  const [hasFirebaseConfig] = useState<boolean>(() => Boolean(getFirebaseConfig()));
+  const [demoBypass, setDemoBypass] = useState<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string>('demo');
+  const [sharedRoomCode] = useState<string>('HOME-2026');
+
+  // --- Modals & Drawers State ---
+  const [isAddDrawerOpen, setIsAddDrawerOpen] = useState<boolean>(false);
+  const [showMoreBillFields, setShowMoreBillFields] = useState<boolean>(false);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // --- Quick Add / Edit Expense Form State ---
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [formAmount, setFormAmount] = useState<string>('');
+  const [formCategory, setFormCategory] = useState<string>('carpentry');
+  const [formCostType, setFormCostType] = useState<string>('Material');
+  const [formPaymentPlan, setFormPaymentPlan] = useState<string>('Full Payment');
+  const [formEmiDetails, setFormEmiDetails] = useState<string>('');
+  const [formPaidBy, setFormPaidBy] = useState<string>('You');
+  const [formTitle, setFormTitle] = useState<string>('');
+  const [formVendor, setFormVendor] = useState<string>('');
+  const [formMode, setFormMode] = useState<string>('UPI');
+  const [formStatus, setFormStatus] = useState<string>('Paid');
+  const [formDate, setFormDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [formNotes, setFormNotes] = useState<string>('');
+  const [formReceipt, setFormReceipt] = useState<string | null>(null);
+
+  // --- Vendor Modal State ---
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState<boolean>(false);
+  const [newVendorName, setNewVendorName] = useState<string>('');
+  const [newVendorTrade, setNewVendorTrade] = useState<string>('');
+  const [newVendorQuoted, setNewVendorQuoted] = useState<string>('');
+  const [newVendorPhone, setNewVendorPhone] = useState<string>('');
+
+  // --- Remembered Last Majuri Defaults ---
+  const savedMajuriPrefs = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('homeledger_majuri_prefs');
+      return raw ? (JSON.parse(raw) as { vendor?: string; roomId?: string; rate?: string }) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  // --- Smart Carpentry Majuri Calculator & Logger State (Defaults to Main Carpenter) ---
+  const [mjVendorSelect, setMjVendorSelect] = useState<string>(
+    savedMajuriPrefs.vendor || DEFAULT_CARPENTER_VENDOR
+  );
+  const [mjCustomVendor, setMjCustomVendor] = useState<string>('');
+  const [mjRoomId, setMjRoomId] = useState<string>(savedMajuriPrefs.roomId || 'living');
+  const [mjItem, setMjItem] = useState<string>('');
+  const [mjUnit, setMjUnit] = useState<string>('ft');
+  const [mjQty, setMjQty] = useState<number>(1);
+  const [mjHeight, setMjHeight] = useState<string>('');
+  const [mjWidth, setMjWidth] = useState<string>('');
+  const [mjRate, setMjRate] = useState<string>(savedMajuriPrefs.rate || '300');
+
+  // --- Advance Payment (Without Measurement) Form State (Defaults to Main Carpenter) ---
+  const [advVendorSelect, setAdvVendorSelect] = useState<string>(
+    savedMajuriPrefs.vendor || DEFAULT_CARPENTER_VENDOR
+  );
+  const [advCustomVendor, setAdvCustomVendor] = useState<string>('');
+  const [advWeekLabel, setAdvWeekLabel] = useState<string>('');
+  const [advAmount, setAdvAmount] = useState<string>('');
+  const [advMode, setAdvMode] = useState<string>('UPI');
+  const [advPaidBy, setAdvPaidBy] = useState<string>('You');
+  const [advDate, setAdvDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [advNotes, setAdvNotes] = useState<string>('');
+  const [advSyncToBills, setAdvSyncToBills] = useState<boolean>(true);
+
+  // --- Transactions Search & Filter State ---
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 3000);
+  };
+
+  // --- Sync Dark Mode Class & Color-Scheme to Root <html> ---
+  useEffect(() => {
+    const root = document.documentElement;
+    if (darkMode) {
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+    } else {
+      root.classList.remove('dark');
+      root.style.colorScheme = 'light';
+    }
+    try {
+      localStorage.setItem('homeledger_theme', darkMode ? 'dark' : 'light');
+    } catch {
+      // Ignore storage restrictions
+    }
+  }, [darkMode]);
+
+  // --- Sync Large Text (A+) Mode ---
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.fontSize = largeTextMode ? '112%' : '100%';
+    try {
+      localStorage.setItem('homeledger_large_text', String(largeTextMode));
+    } catch {
+      // Ignore storage restrictions
+    }
+  }, [largeTextMode]);
+
+  // --- Online / Offline Network Listener ---
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('Back online — cloud sync active');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus('offline');
+      showToast('Offline mode — changes cached locally');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // --- Firebase Authentication Initialization ---
+  useEffect(() => {
+    const config = getFirebaseConfig();
+    if (!config) {
+      setAuthLoading(false);
+      setSyncStatus(isOnline ? 'demo' : 'offline');
+      return;
+    }
+
+    let unsubscribeAuth: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const [{ initializeApp, getApps }, authMod, firestoreMod] = await Promise.all([
+          import('firebase/app'),
+          import('firebase/auth'),
+          import('firebase/firestore')
+        ]);
+
+        const fbApp = getApps().length ? getApps()[0] : initializeApp(config);
+        const fbAuth = authMod.getAuth(fbApp);
+        const fbDb = firestoreMod.getFirestore(fbApp);
+
+        setFbRuntime({
+          auth: fbAuth,
+          db: fbDb,
+          GoogleAuthProvider: authMod.GoogleAuthProvider,
+          signInWithPopup: authMod.signInWithPopup,
+          signOut: authMod.signOut,
+          doc: firestoreMod.doc,
+          setDoc: firestoreMod.setDoc
+        });
+
+        const win = window as unknown as { __initial_auth_token?: string };
+        if (typeof win.__initial_auth_token !== 'undefined' && win.__initial_auth_token) {
+          await authMod.signInWithCustomToken(fbAuth, win.__initial_auth_token).catch(() => {});
+        }
+
+        unsubscribeAuth = authMod.onAuthStateChanged(fbAuth, async (currentUser) => {
+          if (currentUser) {
+            const email = (currentUser.email || '').toLowerCase().trim();
+            if (email && email !== ALLOWED_EMAIL) {
+              await authMod.signOut(fbAuth);
+              setUser(null);
+              setAuthError(`Access Denied: ${email} is not authorized. Only ${ALLOWED_EMAIL} can sign in.`);
+              setAuthLoading(false);
+              return;
+            }
+            setAuthError(null);
+            setUser(currentUser);
+          } else {
+            setUser(null);
+            setSyncStatus(isOnline ? 'demo' : 'offline');
+          }
+          setAuthLoading(false);
+        });
+      } catch (err) {
+        console.warn('Firebase runtime init fallback:', err);
+        setAuthLoading(false);
+      }
+    })();
+
+    return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
+    };
+  }, [isOnline]);
+
+  // --- Firebase Firestore Real-Time Private Owner Sync ---
+  useEffect(() => {
+    if (!fbRuntime?.db || !user) return;
+
+    let unsubscribeSnap: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const { onSnapshot } = await import('firebase/firestore');
+        const cleanCode =
+          (sharedRoomCode || 'HOME-2026').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'HOME-2026';
+        const workspaceDocRef = fbRuntime.doc(
+          fbRuntime.db,
+          'artifacts',
+          appId,
+          'users',
+          user.uid,
+          'workspaces',
+          cleanCode
+        );
+        setSyncStatus(isOnline ? 'syncing' : 'offline');
+
+        unsubscribeSnap = onSnapshot(
+          workspaceDocRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              const data = snapshot.data();
+              if (data?.projects) setProjects(data.projects);
+              if (Array.isArray(data?.majuriEntries)) setMajuriEntries(data.majuriEntries);
+              if (Array.isArray(data?.carpenterAdvances)) setCarpenterAdvances(data.carpenterAdvances);
+              setSyncStatus(isOnline ? 'synced' : 'offline');
+            } else {
+              fbRuntime
+                .setDoc(workspaceDocRef, {
+                  projects: INITIAL_PROJECTS,
+                  majuriEntries: INITIAL_MAJURI_ENTRIES,
+                  carpenterAdvances: INITIAL_CARPENTER_ADVANCES,
+                  inviteCode: cleanCode,
+                  updatedAt: Date.now()
+                })
+                .then(() => setSyncStatus(isOnline ? 'synced' : 'offline'))
+                .catch(() => setSyncStatus('demo'));
+            }
+          },
+          (error) => {
+            console.warn('Firestore snapshot listener error:', error);
+            setSyncStatus('demo');
+          }
+        );
+      } catch (err) {
+        console.warn('Snapshot init skipped:', err);
+      }
+    })();
+
+    return () => {
+      if (unsubscribeSnap) unsubscribeSnap();
+    };
+  }, [fbRuntime, user, sharedRoomCode, isOnline]);
+
+  const saveProjectsToCloud = async (
+    updatedProjects: Record<string, ProjectData>,
+    updatedMajuri: MajuriEntry[] = majuriEntries,
+    updatedAdvances: CarpenterAdvance[] = carpenterAdvances
+  ) => {
+    setProjects(updatedProjects);
+    setMajuriEntries(updatedMajuri);
+    setCarpenterAdvances(updatedAdvances);
+    if (!fbRuntime?.db || !user) return;
+    try {
+      setSyncStatus(isOnline ? 'syncing' : 'offline');
+      const cleanCode =
+        (sharedRoomCode || 'HOME-2026').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'HOME-2026';
+      const workspaceDocRef = fbRuntime.doc(
+        fbRuntime.db,
+        'artifacts',
+        appId,
+        'users',
+        user.uid,
+        'workspaces',
+        cleanCode
+      );
+      await fbRuntime.setDoc(
+        workspaceDocRef,
+        {
+          projects: updatedProjects,
+          majuriEntries: updatedMajuri,
+          carpenterAdvances: updatedAdvances,
+          inviteCode: cleanCode,
+          updatedAt: Date.now()
+        },
+        { merge: true }
+      );
+      setSyncStatus(isOnline ? 'synced' : 'offline');
+    } catch (err) {
+      console.warn('Cloud save error:', err);
+      setSyncStatus('offline');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (!fbRuntime?.auth) {
+      setDemoBypass(true);
+      showToast('Opened local preview mode');
+      return;
+    }
+    try {
+      setAuthError(null);
+      const provider = new fbRuntime.GoogleAuthProvider();
+      provider.setCustomParameters({
+        login_hint: ALLOWED_EMAIL,
+        prompt: 'select_account'
+      });
+      const result = await fbRuntime.signInWithPopup(fbRuntime.auth, provider);
+      const signedInEmail = (result.user?.email || '').toLowerCase().trim();
+      if (signedInEmail !== ALLOWED_EMAIL) {
+        await fbRuntime.signOut(fbRuntime.auth);
+        setUser(null);
+        setAuthError(`Access Denied: ${signedInEmail} is blocked. Sign in only with ${ALLOWED_EMAIL}.`);
+        return;
+      }
+      showToast(`Welcome back, ${ALLOWED_EMAIL}!`);
+    } catch (err) {
+      console.warn('Google sign-in failed:', err);
+      setAuthError('Sign-in cancelled or blocked by browser pop-up settings.');
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!fbRuntime?.auth) {
+      setDemoBypass(false);
+      return;
+    }
+    try {
+      await fbRuntime.signOut(fbRuntime.auth);
+      setUser(null);
+      setDemoBypass(false);
+      showToast('Signed out securely');
+    } catch (err) {
+      console.warn(err);
+    }
+  };
+
+  // --- Current Active Project Derived Metrics ---
+  const currentProject = projects.interior || INITIAL_PROJECTS.interior;
+
+  // --- Available Vendors List for Majuri & Bill Quick-Chips ---
+  const majuriVendorOptions = useMemo(() => {
+    const names = new Set<string>([DEFAULT_CARPENTER_VENDOR]);
+    (projects.interior?.vendors || []).forEach((v) => {
+      if (v.name?.trim()) names.add(v.name.trim());
+    });
+    majuriEntries.forEach((m) => {
+      if (m.vendorName?.trim()) names.add(m.vendorName.trim());
+    });
+    carpenterAdvances.forEach((a) => {
+      if (a.vendorName?.trim()) names.add(a.vendorName.trim());
+    });
+    return Array.from(names);
+  }, [projects, majuriEntries, carpenterAdvances]);
+
+  const savedBillVendorSuggestions = useMemo(() => {
+    const names = new Set<string>([DEFAULT_CARPENTER_VENDOR]);
+    (currentProject.vendors || []).forEach((v) => {
+      if (v.name?.trim()) names.add(v.name.trim());
+    });
+    (currentProject.expenses || []).forEach((e) => {
+      if (e.vendor?.trim() && e.vendor !== 'Direct Purchase') names.add(e.vendor.trim());
+    });
+    return Array.from(names).slice(0, 8);
+  }, [currentProject]);
+
+  // --- Duplicate Bill Guard Check ---
+  const duplicateBillWarning = useMemo(() => {
+    const numAmt = Number(formAmount);
+    if (!numAmt || numAmt <= 0 || editingExpenseId) return null;
+    const targetVendor = (formVendor.trim() || 'Direct Purchase').toLowerCase();
+    const match = (currentProject.expenses || []).find(
+      (exp) =>
+        Number(exp.amount) === numAmt &&
+        exp.date === formDate &&
+        (exp.vendor || 'Direct Purchase').toLowerCase() === targetVendor
+    );
+    return match || null;
+  }, [formAmount, formDate, formVendor, editingExpenseId, currentProject.expenses]);
+
+  const analytics = useMemo(() => {
+    const expenses = currentProject.expenses || [];
+
+    let totalSpent = 0;
+    let paidAmount = 0;
+    let advanceAmount = 0;
+    let pendingAmount = 0;
+
+    let materialSpent = 0;
+    let labourSpent = 0;
+    let turnkeyOrLumpsumSpent = 0;
+
+    const byCategory: Record<string, CategoryItem & { spent: number; count: number }> = {};
+    INTERIOR_CATEGORIES.forEach((cat) => {
+      byCategory[cat.id] = {
+        ...cat,
+        spent: 0,
+        count: 0
+      };
+    });
+
+    expenses.forEach((exp) => {
+      const amt = Number(exp.amount) || 0;
+      totalSpent += amt;
+
+      if (exp.status === 'Paid') paidAmount += amt;
+      else if (exp.status === 'Advance') advanceAmount += amt;
+      else pendingAmount += amt;
+
+      const cType = exp.costType || 'Material';
+      if (cType === 'Labour') labourSpent += amt;
+      else if (cType === 'Turnkey' || cType === 'Lumpsum') turnkeyOrLumpsumSpent += amt;
+      else materialSpent += amt;
+
+      if (byCategory[exp.category]) {
+        byCategory[exp.category].spent += amt;
+        byCategory[exp.category].count += 1;
+      }
+    });
+
+    const splitTotal = materialSpent + labourSpent + turnkeyOrLumpsumSpent || 1;
+    const materialPct = Math.round((materialSpent / splitTotal) * 100);
+    const labourPct = Math.round((labourSpent / splitTotal) * 100);
+    const turnkeyPct = Math.max(0, 100 - materialPct - labourPct);
+
+    const categoryList = Object.values(byCategory).map((c) => ({
+      ...c,
+      sharePct: totalSpent > 0 ? Math.round((c.spent / totalSpent) * 100) : 0
+    }));
+
+    const categoryDonutData = categoryList
+      .filter((c) => c.spent > 0)
+      .map((c) => ({
+        name: c.shortLabel,
+        value: c.spent,
+        color: c.color
+      }));
+
+    const vendorStats = (currentProject.vendors || []).map((v) => {
+      const vendorExpenses = expenses.filter(
+        (e) => e.vendor && e.vendor.toLowerCase().trim() === v.name.toLowerCase().trim()
+      );
+      const paidToVendor = vendorExpenses
+        .filter((e) => e.status === 'Paid' || e.status === 'Advance')
+        .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+      const quoted = Number(v.quoted) || 0;
+      const balanceRemaining = Math.max(0, quoted - paidToVendor);
+      const progressPct = quoted > 0 ? Math.min(100, Math.round((paidToVendor / quoted) * 100)) : 100;
+
+      return {
+        ...v,
+        milestones: v.milestones || [],
+        paidToVendor,
+        balanceRemaining,
+        progressPct,
+        txCount: vendorExpenses.length
+      };
+    });
+
+    const totalVendorDues =
+      pendingAmount + vendorStats.reduce((sum, v) => sum + v.balanceRemaining, 0);
+
+    return {
+      totalSpent,
+      billCount: expenses.length,
+      paidAmount,
+      advanceAmount,
+      pendingAmount,
+      totalVendorDues,
+      materialSpent,
+      labourSpent,
+      turnkeyOrLumpsumSpent,
+      materialPct,
+      labourPct,
+      turnkeyPct,
+      categoryList,
+      categoryDonutData,
+      vendorStats
+    };
+  }, [currentProject]);
+
+  // --- Filtered Transactions List ---
+  const filteredExpenses = useMemo(() => {
+    return (currentProject.expenses || [])
+      .filter((exp) => {
+        if (selectedCategoryFilter !== 'all' && exp.category !== selectedCategoryFilter) {
+          return false;
+        }
+        if (costTypeFilter !== 'all') {
+          const cType = exp.costType || 'Material';
+          if (cType !== costTypeFilter) return false;
+        }
+        if (statusFilter !== 'all' && exp.status !== statusFilter) {
+          return false;
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = exp.title?.toLowerCase().includes(q);
+          const matchVendor = exp.vendor?.toLowerCase().includes(q);
+          const matchPaidBy = exp.paidBy?.toLowerCase().includes(q);
+          const matchNotes = exp.notes?.toLowerCase().includes(q);
+          if (!matchTitle && !matchVendor && !matchPaidBy && !matchNotes) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [currentProject.expenses, selectedCategoryFilter, costTypeFilter, statusFilter, searchQuery]);
+
+  const activeCategoryObj = useMemo(
+    () => findCategoryById(formCategory),
+    [formCategory]
+  );
+
+  const selectedFilterCategoryObj = useMemo(
+    () => (selectedCategoryFilter !== 'all' ? findCategoryById(selectedCategoryFilter) : null),
+    [selectedCategoryFilter]
+  );
+
+  // --- Handlers for Adding / Editing / Duplicating / Deleting Expenses ---
+  const openAddExpenseDrawer = (prefill: Partial<ExpenseItem> = {}, isDuplicate = false) => {
+    const targetCatId =
+      prefill.category || (selectedCategoryFilter !== 'all' ? selectedCategoryFilter : 'carpentry');
+    const targetCat = findCategoryById(targetCatId);
+
+    setEditingExpenseId(isDuplicate ? null : prefill.id || null);
+    setFormAmount(prefill.amount ? String(prefill.amount) : '');
+    setFormCategory(targetCatId);
+    setFormCostType(prefill.costType || targetCat.defaultCostType);
+    setFormPaymentPlan(prefill.paymentPlan || 'Full Payment');
+    setFormEmiDetails(prefill.emiDetails || '');
+    setFormPaidBy(prefill.paidBy || 'You');
+    setFormTitle(prefill.title || '');
+    setFormVendor(prefill.vendor || '');
+    setFormMode(prefill.mode || 'UPI');
+    setFormStatus(prefill.status || 'Paid');
+    setFormDate(
+      isDuplicate
+        ? new Date().toISOString().split('T')[0]
+        : prefill.date || new Date().toISOString().split('T')[0]
+    );
+    setFormNotes(prefill.notes || '');
+    setFormReceipt(prefill.receipt || null);
+    setShowMoreBillFields(
+      Boolean(
+        prefill.vendor ||
+          prefill.receipt ||
+          prefill.notes ||
+          prefill.paymentPlan === 'EMI' ||
+          targetCatId === 'appliances'
+      )
+    );
+    setIsAddDrawerOpen(true);
+  };
+
+  const handleSelectDrawerCategory = (catId: string) => {
+    const cat = findCategoryById(catId);
+    setFormCategory(catId);
+    setFormCostType(cat.defaultCostType);
+    if (catId === 'appliances') {
+      setShowMoreBillFields(true);
+    }
+  };
+
+  const handleQuickAddAmount = (delta: number) => {
+    const current = Number(formAmount) || 0;
+    setFormAmount(String(current + delta));
+  };
+
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressReceiptImage(file);
+      setFormReceipt(compressed);
+      showToast('Bill photo attached!');
+    } catch {
+      showToast('Could not process image');
+    }
+  };
+
+  const handleSaveExpense = (e: React.FormEvent) => {
+    e.preventDefault();
+    const numericAmount = Number(formAmount);
+    if (!numericAmount || numericAmount <= 0) {
+      showToast('Please enter a valid ₹ amount');
+      return;
+    }
+
+    const catObj = findCategoryById(formCategory);
+    const cleanTitle = formTitle.trim() || `${catObj.label} (${formCostType})`;
+    const cleanVendor =
+      formVendor.trim() || (formCategory === 'appliances' ? 'Store / Online' : 'Direct Purchase');
+
+    const expenseRecord: ExpenseItem = {
+      id: editingExpenseId || `exp_${Date.now()}`,
+      title: cleanTitle,
+      amount: numericAmount,
+      category: formCategory,
+      costType: formCostType,
+      paymentPlan: formCategory === 'appliances' ? formPaymentPlan : 'Full Payment',
+      emiDetails:
+        formCategory === 'appliances' && formPaymentPlan === 'EMI' ? formEmiDetails.trim() : '',
+      paidBy: formPaidBy,
+      vendor: cleanVendor,
+      mode: formMode,
+      status: formStatus,
+      date: formDate,
+      notes: formNotes.trim(),
+      receipt: formReceipt || null
+    };
+
+    const existingExpenses = currentProject.expenses || [];
+    const updatedExpenses = editingExpenseId
+      ? existingExpenses.map((item) => (item.id === editingExpenseId ? expenseRecord : item))
+      : [expenseRecord, ...existingExpenses];
+
+    const updatedProjects = {
+      ...projects,
+      interior: {
+        ...currentProject,
+        expenses: updatedExpenses
+      }
+    };
+
+    saveProjectsToCloud(updatedProjects);
+    setIsAddDrawerOpen(false);
+    setEditingExpenseId(null);
+    showToast(editingExpenseId ? 'Bill updated!' : `${formatINR(numericAmount)} saved!`);
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    const updatedExpenses = (currentProject.expenses || []).filter((e) => e.id !== expenseId);
+    const updatedProjects = {
+      ...projects,
+      interior: {
+        ...currentProject,
+        expenses: updatedExpenses
+      }
+    };
+    saveProjectsToCloud(updatedProjects);
+    showToast('Bill removed');
+  };
+
+  // --- Add New Vendor Handler ---
+  const handleAddVendor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVendorName.trim()) {
+      showToast('Enter contractor or vendor name');
+      return;
+    }
+    const quotedNum = Number(newVendorQuoted) || 0;
+    const vendorObj: VendorItem = {
+      id: `v_${Date.now()}`,
+      name: newVendorName.trim(),
+      trade: newVendorTrade.trim() || 'Interior Contractor',
+      quoted: quotedNum,
+      phone: newVendorPhone.trim() || 'Not added',
+      milestones:
+        quotedNum > 0
+          ? [
+              { id: `ms_${Date.now()}_1`, label: '30% Advance', amount: Math.round(quotedNum * 0.3), dueDate: new Date().toISOString().split('T')[0], status: 'Due Soon' },
+              { id: `ms_${Date.now()}_2`, label: '50% Work Stage', amount: Math.round(quotedNum * 0.5), dueDate: '2026-12-05', status: 'Upcoming' },
+              { id: `ms_${Date.now()}_3`, label: '20% Handover', amount: Math.round(quotedNum * 0.2), dueDate: '2026-12-20', status: 'Upcoming' }
+            ]
+          : []
+    };
+
+    const updatedProjects = {
+      ...projects,
+      interior: {
+        ...currentProject,
+        vendors: [...(currentProject.vendors || []), vendorObj]
+      }
+    };
+
+    saveProjectsToCloud(updatedProjects);
+    setNewVendorName('');
+    setNewVendorTrade('');
+    setNewVendorQuoted('');
+    setNewVendorPhone('');
+    setIsVendorModalOpen(false);
+    showToast(`${vendorObj.name} added`);
+  };
+
+  // --- Toggle Milestone Paid Status & Log Expense ---
+  const handleMarkMilestonePaid = (vendor: VendorItem, milestone: MilestoneItem) => {
+    const updatedVendors = (currentProject.vendors || []).map((v) => {
+      if (v.id !== vendor.id) return v;
+      return {
+        ...v,
+        milestones: (v.milestones || []).map((m) =>
+          m.id === milestone.id ? { ...m, status: 'Paid' } : m
+        )
+      };
+    });
+
+    const newExpense: ExpenseItem = {
+      id: `exp_ms_${Date.now()}`,
+      title: `${vendor.name} — ${milestone.label}`,
+      amount: Number(milestone.amount) || 0,
+      category: 'carpentry',
+      costType: 'Labour',
+      paidBy: 'You',
+      vendor: vendor.name,
+      mode: 'UPI',
+      status: 'Paid',
+      date: new Date().toISOString().split('T')[0],
+      notes: `Milestone paid (${milestone.label})`
+    };
+
+    const updatedProjects = {
+      ...projects,
+      interior: {
+        ...currentProject,
+        vendors: updatedVendors,
+        expenses: [newExpense, ...(currentProject.expenses || [])]
+      }
+    };
+
+    saveProjectsToCloud(updatedProjects);
+    showToast(`Milestone "${milestone.label}" marked Paid!`);
+  };
+
+  // --- Smart Majuri Live Calculation (Qty × Height × Width × Sq.Ft Rate) ---
+  const liveMajuriCalc = useMemo(() => {
+    const q = Math.max(1, Number(mjQty) || 1);
+    const h = parseFloat(mjHeight) || 0;
+    const w = parseFloat(mjWidth) || 0;
+    const r = parseFloat(mjRate) || 0;
+    const rawArea = q * h * w;
+    const sqft = mjUnit === 'in' ? rawArea / 144 : rawArea;
+    const roundedSqft = Math.round(sqft * 100) / 100;
+    const amount = Math.round(roundedSqft * r);
+    return { qty: q, sqft: roundedSqft, amount };
+  }, [mjQty, mjHeight, mjWidth, mjRate, mjUnit]);
+
+  // --- Filtered Majuri & Advance Lists by Vendor ---
+  const filteredMajuriEntries = useMemo(() => {
+    return majuriEntries.filter((m) => {
+      const vName = m.vendorName || DEFAULT_CARPENTER_VENDOR;
+      if (selectedMajuriVendorFilter !== 'all' && vName !== selectedMajuriVendorFilter) {
+        return false;
+      }
+      if (selectedMajuriRoomFilter !== 'all' && m.roomId !== selectedMajuriRoomFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [majuriEntries, selectedMajuriVendorFilter, selectedMajuriRoomFilter]);
+
+  const filteredCarpenterAdvances = useMemo(() => {
+    return carpenterAdvances.filter((a) => {
+      const vName = a.vendorName || DEFAULT_CARPENTER_VENDOR;
+      if (selectedMajuriVendorFilter !== 'all' && vName !== selectedMajuriVendorFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [carpenterAdvances, selectedMajuriVendorFilter]);
+
+  const majuriSummary = useMemo(() => {
+    const vendorScopedEntries = majuriEntries.filter((m) =>
+      selectedMajuriVendorFilter === 'all'
+        ? true
+        : (m.vendorName || DEFAULT_CARPENTER_VENDOR) === selectedMajuriVendorFilter
+    );
+    const vendorScopedAdvances = carpenterAdvances.filter((a) =>
+      selectedMajuriVendorFilter === 'all'
+        ? true
+        : (a.vendorName || DEFAULT_CARPENTER_VENDOR) === selectedMajuriVendorFilter
+    );
+
+    let totalSqft = 0;
+    let totalWorkBill = 0;
+
+    const byRoom = MAJURI_ROOMS.map((room) => {
+      const items = vendorScopedEntries.filter((e) => e.roomId === room.id);
+      const roomSqft = items.reduce((s, e) => s + (Number(e.sqft) || 0), 0);
+      const roomAmt = items.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      totalSqft += roomSqft;
+      totalWorkBill += roomAmt;
+      return {
+        ...room,
+        sqft: Math.round(roomSqft * 10) / 10,
+        amount: roomAmt,
+        count: items.length
+      };
+    });
+
+    const totalAdvancePaid = vendorScopedAdvances.reduce(
+      (sum, a) => sum + (Number(a.amount) || 0),
+      0
+    );
+
+    const netBalance = totalWorkBill - totalAdvancePaid;
+    const settledPct =
+      totalWorkBill > 0
+        ? Math.min(100, Math.round((totalAdvancePaid / totalWorkBill) * 100))
+        : 0;
+
+    const roomsWithShare = byRoom.map((r) => ({
+      ...r,
+      sharePct: totalWorkBill > 0 ? Math.round((r.amount / totalWorkBill) * 100) : 0
+    }));
+
+    const byVendorMap: Record<
+      string,
+      { vendorName: string; sqft: number; workBill: number; advances: number; balance: number }
+    > = {};
+
+    majuriEntries.forEach((m) => {
+      const vName = m.vendorName || DEFAULT_CARPENTER_VENDOR;
+      if (!byVendorMap[vName]) {
+        byVendorMap[vName] = { vendorName: vName, sqft: 0, workBill: 0, advances: 0, balance: 0 };
+      }
+      byVendorMap[vName].sqft += Number(m.sqft) || 0;
+      byVendorMap[vName].workBill += Number(m.amount) || 0;
+    });
+
+    carpenterAdvances.forEach((a) => {
+      const vName = a.vendorName || DEFAULT_CARPENTER_VENDOR;
+      if (!byVendorMap[vName]) {
+        byVendorMap[vName] = { vendorName: vName, sqft: 0, workBill: 0, advances: 0, balance: 0 };
+      }
+      byVendorMap[vName].advances += Number(a.amount) || 0;
+    });
+
+    const vendorBreakdown = Object.values(byVendorMap).map((v) => ({
+      ...v,
+      sqft: Math.round(v.sqft * 10) / 10,
+      balance: v.workBill - v.advances
+    }));
+
+    return {
+      totalSqft: Math.round(totalSqft * 10) / 10,
+      totalWorkBill,
+      totalAdvancePaid,
+      netBalance,
+      settledPct,
+      rooms: roomsWithShare,
+      vendorBreakdown
+    };
+  }, [majuriEntries, carpenterAdvances, selectedMajuriVendorFilter]);
+
+  const handleSaveMajuriEntry = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (liveMajuriCalc.sqft <= 0 || liveMajuriCalc.amount <= 0) {
+      showToast('Enter valid Height, Width & Sq.ft Rate');
+      return;
+    }
+
+    const resolvedVendor =
+      mjVendorSelect === '__custom__'
+        ? mjCustomVendor.trim() || DEFAULT_CARPENTER_VENDOR
+        : mjVendorSelect || DEFAULT_CARPENTER_VENDOR;
+
+    const roomObj = MAJURI_ROOMS.find((r) => r.id === mjRoomId) || MAJURI_ROOMS[0];
+    const cleanItem = mjItem.trim() || `${roomObj.label} Carpentry Work`;
+
+    const newMajuri: MajuriEntry = {
+      id: `mj_${Date.now()}`,
+      vendorName: resolvedVendor,
+      roomId: mjRoomId,
+      item: cleanItem,
+      unit: mjUnit,
+      qty: liveMajuriCalc.qty,
+      height: parseFloat(mjHeight),
+      width: parseFloat(mjWidth),
+      sqft: liveMajuriCalc.sqft,
+      rate: parseFloat(mjRate),
+      amount: liveMajuriCalc.amount,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    let updatedProjects = projects;
+    const existingVendors = projects.interior?.vendors || [];
+    const vendorExists = existingVendors.some(
+      (v) => v.name.toLowerCase().trim() === resolvedVendor.toLowerCase().trim()
+    );
+    if (!vendorExists && resolvedVendor !== DEFAULT_CARPENTER_VENDOR) {
+      updatedProjects = {
+        ...projects,
+        interior: {
+          ...projects.interior,
+          vendors: [
+            ...existingVendors,
+            {
+              id: `v_mj_${Date.now()}`,
+              name: resolvedVendor,
+              trade: 'Carpentry Contractor',
+              quoted: 0,
+              phone: 'Not added',
+              milestones: []
+            }
+          ]
+        }
+      };
+    }
+
+    const updatedMajuri = [newMajuri, ...majuriEntries];
+    saveProjectsToCloud(updatedProjects, updatedMajuri, carpenterAdvances);
+
+    try {
+      localStorage.setItem(
+        'homeledger_majuri_prefs',
+        JSON.stringify({ vendor: resolvedVendor, roomId: mjRoomId, rate: mjRate })
+      );
+    } catch {
+      // Ignore storage errors
+    }
+
+    setMjItem('');
+    setMjQty(1);
+    setMjHeight('');
+    setMjWidth('');
+    if (mjVendorSelect === '__custom__') {
+      setMjVendorSelect(resolvedVendor);
+      setMjCustomVendor('');
+    }
+    showToast(`${liveMajuriCalc.sqft} sq.ft (${formatINR(liveMajuriCalc.amount)}) added for ${resolvedVendor}`);
+  };
+
+  const handleRepeatMajuriEntry = (entry: MajuriEntry) => {
+    const repeated: MajuriEntry = {
+      ...entry,
+      id: `mj_${Date.now()}`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    const updatedMajuri = [repeated, ...majuriEntries];
+    saveProjectsToCloud(projects, updatedMajuri, carpenterAdvances);
+    showToast(`Repeated "${entry.item}" (${formatINR(entry.amount)})`);
+  };
+
+  const handleDeleteMajuriEntry = (id: string) => {
+    const updatedMajuri = majuriEntries.filter((m) => m.id !== id);
+    saveProjectsToCloud(projects, updatedMajuri, carpenterAdvances);
+    showToast('Measurement removed');
+  };
+
+  // --- Log Advance Payment (Without Measurement) & Sync to Interior Bills ---
+  const handleSaveCarpenterAdvance = (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmt = Number(advAmount);
+    if (!numAmt || numAmt <= 0) {
+      showToast('Enter valid advance ₹ amount');
+      return;
+    }
+
+    const resolvedVendor =
+      advVendorSelect === '__custom__'
+        ? advCustomVendor.trim() || DEFAULT_CARPENTER_VENDOR
+        : advVendorSelect || DEFAULT_CARPENTER_VENDOR;
+
+    const vendorAdvanceCount = carpenterAdvances.filter(
+      (a) => (a.vendorName || DEFAULT_CARPENTER_VENDOR) === resolvedVendor
+    ).length;
+
+    const cleanLabel =
+      advWeekLabel.trim() || `Advance Payment #${vendorAdvanceCount + 1}`;
+    const advId = `ca_${Date.now()}`;
+    const syncedExpenseId = advSyncToBills ? `exp_${advId}` : null;
+
+    const newAdv: CarpenterAdvance = {
+      id: advId,
+      vendorName: resolvedVendor,
+      syncedExpenseId,
+      weekLabel: cleanLabel,
+      amount: numAmt,
+      mode: advMode,
+      paidBy: advPaidBy,
+      date: advDate,
+      notes: advNotes.trim() || 'Advance payment without measurement'
+    };
+
+    const updatedAdvances = [newAdv, ...carpenterAdvances];
+    let updatedProjects = projects;
+
+    if (advSyncToBills && syncedExpenseId) {
+      const interiorProj = projects.interior;
+      const existingVendors = interiorProj.vendors || [];
+      const vendorExists = existingVendors.some(
+        (v) => v.name.toLowerCase().trim() === resolvedVendor.toLowerCase().trim()
+      );
+
+      const updatedVendors =
+        !vendorExists && resolvedVendor !== DEFAULT_CARPENTER_VENDOR
+          ? [
+              ...existingVendors,
+              {
+                id: `v_adv_${Date.now()}`,
+                name: resolvedVendor,
+                trade: 'Carpentry Contractor',
+                quoted: 0,
+                phone: 'Not added',
+                milestones: []
+              }
+            ]
+          : existingVendors;
+
+      const syncedExpense: ExpenseItem = {
+        id: syncedExpenseId,
+        title: `Majuri Advance (${resolvedVendor}): ${cleanLabel}`,
+        amount: numAmt,
+        category: 'carpentry',
+        costType: 'Labour',
+        paidBy: advPaidBy,
+        vendor: resolvedVendor,
+        mode: advMode,
+        status: 'Advance',
+        date: advDate,
+        notes: newAdv.notes
+      };
+      updatedProjects = {
+        ...projects,
+        interior: {
+          ...interiorProj,
+          vendors: updatedVendors,
+          expenses: [syncedExpense, ...(interiorProj.expenses || [])]
+        }
+      };
+    }
+
+    saveProjectsToCloud(updatedProjects, majuriEntries, updatedAdvances);
+    setAdvWeekLabel('');
+    setAdvAmount('');
+    setAdvNotes('');
+    if (advVendorSelect === '__custom__') {
+      setAdvVendorSelect(resolvedVendor);
+      setAdvCustomVendor('');
+    }
+    showToast(
+      advSyncToBills
+        ? `Advance ${formatINR(numAmt)} for ${resolvedVendor} logged & synced!`
+        : `Advance ${formatINR(numAmt)} for ${resolvedVendor} recorded!`
+    );
+  };
+
+  const handleDeleteCarpenterAdvance = (id: string) => {
+    const targetAdv = carpenterAdvances.find((a) => a.id === id);
+    const updatedAdvances = carpenterAdvances.filter((a) => a.id !== id);
+    let updatedProjects = projects;
+
+    if (targetAdv?.syncedExpenseId) {
+      const interiorProj = projects.interior;
+      updatedProjects = {
+        ...projects,
+        interior: {
+          ...interiorProj,
+          expenses: (interiorProj.expenses || []).filter(
+            (e) => e.id !== targetAdv.syncedExpenseId
+          )
+        }
+      };
+    }
+
+    saveProjectsToCloud(updatedProjects, majuriEntries, updatedAdvances);
+    showToast('Advance & synced bill removed');
+  };
+
+  // --- 1-Tap WhatsApp Payment Summary Share ---
+  const handleShareWhatsApp = (summaryText: string) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(summaryText).catch(() => {});
+    }
+    const encoded = encodeURIComponent(summaryText);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
+    showToast('Summary copied & opening WhatsApp...');
+  };
+
+  // --- Graphical Print-Ready PDF Report Generator ---
+  const handlePrintGraphicalPDF = () => {
+    const reportWindow = window.open('', '_blank', 'width=900,height=1100');
+    if (!reportWindow) {
+      showToast('Pop-up blocked — allow pop-ups to save PDF');
+      return;
+    }
+
+    const generatedOn = new Date().toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    const scopeTitle =
+      selectedMajuriVendorFilter === 'all'
+        ? 'All Carpenters & Vendors'
+        : selectedMajuriVendorFilter;
+
+    reportWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>HomeLedger — Graphical Interior & Majuri Report</title>
+          <style>
+            * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { margin: 0; padding: 28px; color: #0f172a; background: #ffffff; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; padding: 24px 28px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+            .header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.4px; }
+            .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
+            .badge { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+            .kpi { border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px; background: #f8fafc; }
+            .kpi-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; }
+            .kpi-val { font-size: 20px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+            .section { border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; margin-bottom: 18px; page-break-inside: avoid; }
+            .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #4f46e5; margin: 0 0 14px; }
+            .bar-row { margin-bottom: 12px; }
+            .bar-meta { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+            .bar-track { width: 100%; height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+            .bar-fill { height: 100%; border-radius: 999px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { text-align: left; padding: 10px 8px; background: #f1f5f9; color: #475569; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
+            td { padding: 9px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+            .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+            .paid { background: #dcfce7; color: #166534; }
+            .advance { background: #fef3c7; color: #92400e; }
+            .pending { background: #ffe4e6; color: #9f1239; }
+            .footer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 24px; }
+            @media print { body { padding: 12px; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1>HomeLedger • Interior & Appliances Statement</h1>
+              <p>Trade-Wise Renovation, Majuri Khata & Appliance Purchases</p>
+            </div>
+            <div class="badge">Generated ${generatedOn}</div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="kpi-label">Total Actual Spent</div>
+              <div class="kpi-val" style="color:#4f46e5;">${formatINR(analytics.totalSpent)}</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Settled / Paid</div>
+              <div class="kpi-val" style="color:#059669;">${formatINR(analytics.paidAmount)}</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Advance Given</div>
+              <div class="kpi-val" style="color:#d97706;">${formatINR(analytics.advanceAmount)}</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Pending & Vendor Dues</div>
+              <div class="kpi-val" style="color:#e11d48;">${formatINR(analytics.totalVendorDues)}</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3 class="section-title">Trade & Shopping Section Breakdown</h3>
+            ${analytics.categoryList
+              .map(
+                (cat) => `
+                  <div class="bar-row">
+                    <div class="bar-meta">
+                      <span>${cat.label} (${cat.count} bills)</span>
+                      <span>${formatINR(cat.spent)} (${cat.sharePct}%)</span>
+                    </div>
+                    <div class="bar-track">
+                      <div class="bar-fill" style="width:${cat.sharePct}%; background:${cat.color};"></div>
+                    </div>
+                  </div>
+                `
+              )
+              .join('')}
+          </div>
+
+          <div class="section" style="border-color:#fed7aa; background:#fffaf5;">
+            <h3 class="section-title" style="color:#ea580c;">Carpentry Majuri & Advance Khata (${scopeTitle})</h3>
+            <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:14px;">
+              <div class="kpi" style="background:#ffffff;">
+                <div class="kpi-label">Total Measured Area</div>
+                <div class="kpi-val" style="font-size:17px; color:#ea580c;">${majuriSummary.totalSqft} sq.ft.</div>
+              </div>
+              <div class="kpi" style="background:#ffffff;">
+                <div class="kpi-label">Total Work Bill</div>
+                <div class="kpi-val" style="font-size:17px; color:#4f46e5;">${formatINR(majuriSummary.totalWorkBill)}</div>
+              </div>
+              <div class="kpi" style="background:#ffffff;">
+                <div class="kpi-label">Advances Paid (No Meas.)</div>
+                <div class="kpi-val" style="font-size:17px; color:#059669;">${formatINR(majuriSummary.totalAdvancePaid)}</div>
+              </div>
+              <div class="kpi" style="background:#ffffff;">
+                <div class="kpi-label">${majuriSummary.netBalance >= 0 ? 'Net Balance Payable' : 'Extra Advance Credit'}</div>
+                <div class="kpi-val" style="font-size:17px; color:${majuriSummary.netBalance >= 0 ? '#e11d48' : '#d97706'};">${formatINR(Math.abs(majuriSummary.netBalance))}</div>
+              </div>
+            </div>
+
+            <table style="margin-bottom:14px; background:#ffffff;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Vendor / Carpenter</th>
+                  <th>Room / Area</th>
+                  <th>Work Description</th>
+                  <th>Dimensions</th>
+                  <th>Area (Sq.Ft)</th>
+                  <th>Rate</th>
+                  <th style="text-align:right;">Majuri Bill</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredMajuriEntries
+                  .map((m) => {
+                    const rLabel = MAJURI_ROOMS.find((r) => r.id === m.roomId)?.label || m.roomId;
+                    const qPrefix = (m.qty || 1) > 1 ? `${m.qty} × ` : '';
+                    return `
+                      <tr>
+                        <td>${m.date}</td>
+                        <td><strong>${m.vendorName || DEFAULT_CARPENTER_VENDOR}</strong></td>
+                        <td>${rLabel}</td>
+                        <td>${m.item}</td>
+                        <td>${qPrefix}${m.height}${m.unit} × ${m.width}${m.unit}</td>
+                        <td>${m.sqft} ft²</td>
+                        <td>₹${m.rate}/ft²</td>
+                        <td style="text-align:right; font-weight:800;">${formatINR(m.amount)}</td>
+                      </tr>
+                    `;
+                  })
+                  .join('')}
+                <tr style="background:#fff7ed;">
+                  <td colspan="5" style="font-weight:800; color:#9a3412;">TOTAL MEASURED CARPENTRY WORK BILL</td>
+                  <td style="font-weight:800; color:#9a3412;">${majuriSummary.totalSqft} ft²</td>
+                  <td>—</td>
+                  <td style="text-align:right; font-weight:900; color:#ea580c;">${formatINR(majuriSummary.totalWorkBill)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <table style="background:#ffffff;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Vendor / Carpenter</th>
+                  <th>Advance Payment (No Meas.)</th>
+                  <th>Paid By</th>
+                  <th>Mode</th>
+                  <th>Notes</th>
+                  <th style="text-align:right;">Advance Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredCarpenterAdvances
+                  .map(
+                    (a) => `
+                    <tr>
+                      <td>${a.date}</td>
+                      <td><strong>${a.vendorName || DEFAULT_CARPENTER_VENDOR}</strong></td>
+                      <td>${a.weekLabel}</td>
+                      <td>${a.paidBy}</td>
+                      <td>${a.mode}</td>
+                      <td>${a.notes || '—'}</td>
+                      <td style="text-align:right; font-weight:800; color:#059669;">${formatINR(a.amount)}</td>
+                    </tr>
+                  `
+                  )
+                  .join('')}
+                <tr style="background:#ecfdf5;">
+                  <td colspan="6" style="font-weight:800; color:#065f46;">TOTAL ADVANCES PAID WITHOUT MEASUREMENT (${filteredCarpenterAdvances.length} ENTRIES)</td>
+                  <td style="text-align:right; font-weight:900; color:#059669;">${formatINR(majuriSummary.totalAdvancePaid)}</td>
+                </tr>
+                <tr style="background:${majuriSummary.netBalance >= 0 ? '#fff1f2' : '#fef3c7'};">
+                  <td colspan="6" style="font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#9f1239' : '#92400e'};">
+                    ${majuriSummary.netBalance >= 0 ? 'NET BALANCE PAYABLE (WORK BILL − ADVANCES)' : 'EXTRA ADVANCE CREDIT HELD BY CONTRACTOR'}
+                  </td>
+                  <td style="text-align:right; font-weight:900; color:${majuriSummary.netBalance >= 0 ? '#e11d48' : '#d97706'};">
+                    ${formatINR(Math.abs(majuriSummary.netBalance))}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <h3 class="section-title">Itemized Interior & Appliances Ledger (${(currentProject.expenses || []).length} Entries)</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Section</th>
+                  <th>Type</th>
+                  <th>Store / Vendor</th>
+                  <th>Payment Plan</th>
+                  <th>Mode</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(currentProject.expenses || [])
+                  .map((e) => {
+                    const catLabel = findCategoryById(e.category).shortLabel;
+                    const stClass = e.status === 'Paid' ? 'paid' : e.status === 'Advance' ? 'advance' : 'pending';
+                    const planStr =
+                      e.paymentPlan === 'EMI'
+                        ? `EMI${e.emiDetails ? ` (${e.emiDetails})` : ''}`
+                        : 'Full';
+                    return `
+                      <tr>
+                        <td>${e.date}</td>
+                        <td><strong>${e.title}</strong></td>
+                        <td>${catLabel}</td>
+                        <td>${e.costType || 'Material'}</td>
+                        <td>${e.vendor}</td>
+                        <td>${planStr}</td>
+                        <td>${e.mode}</td>
+                        <td><span class="pill ${stClass}">${e.status}</span></td>
+                        <td style="text-align:right; font-weight:800;">${formatINR(e.amount)}</td>
+                      </tr>
+                    `;
+                  })
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="footer">Generated via HomeLedger • Interior & Majuri Expense Manager</div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    reportWindow.document.close();
+    showToast('Opening print-ready Graphical PDF...');
+  };
+
+  // --- 1-Click CSV / Excel Report Export ---
+  const handleExportCSV = () => {
+    const headers = ['Date', 'Title', 'Trade / Section', 'Type', 'Paid By', 'Store / Vendor', 'Payment Plan', 'EMI Details', 'Amount (INR)', 'Payment Mode', 'Status', 'Notes'];
+    const rows = (currentProject.expenses || []).map((e) => {
+      const catLabel = findCategoryById(e.category).label;
+      return [
+        e.date,
+        `"${(e.title || '').replace(/"/g, '""')}"`,
+        `"${catLabel}"`,
+        e.costType || 'Material',
+        e.paidBy || 'You',
+        `"${(e.vendor || '').replace(/"/g, '""')}"`,
+        e.paymentPlan || 'Full Payment',
+        `"${(e.emiDetails || '').replace(/"/g, '""')}"`,
+        e.amount,
+        e.mode,
+        e.status,
+        `"${(e.notes || '').replace(/"/g, '""')}"`
+      ].join(',');
+    });
+
+    const csvBody = [
+      headers.join(','),
+      ...rows,
+      '',
+      ['CARPENTRY MAJURI KHATA SUMMARY', `Total Sq.Ft: ${majuriSummary.totalSqft}`, `Total Work Bill (INR): ${majuriSummary.totalWorkBill}`, `Advances Paid (INR): ${majuriSummary.totalAdvancePaid}`, `Net Payable Balance (INR): ${majuriSummary.netBalance}`].join(','),
+      ['Date', 'Vendor / Carpenter', 'Room / Area', 'Work Description', 'Qty', 'Height', 'Width', 'Unit', 'Area (Sq.Ft)', 'Rate (INR/Sq.Ft)', 'Majuri Amount (INR)'].join(','),
+      ...majuriEntries.map((m) => {
+        const rLabel = MAJURI_ROOMS.find((r) => r.id === m.roomId)?.label || m.roomId;
+        return [m.date, `"${(m.vendorName || DEFAULT_CARPENTER_VENDOR).replace(/"/g, '""')}"`, `"${rLabel}"`, `"${(m.item || '').replace(/"/g, '""')}"`, m.qty || 1, m.height, m.width, m.unit, m.sqft, m.rate, m.amount].join(',');
+      }),
+      '',
+      ['Date', 'Vendor / Carpenter', 'Advance Label (No Measurement)', 'Paid By', 'Mode', 'Advance Amount (INR)', 'Notes'].join(','),
+      ...carpenterAdvances.map((a) =>
+        [a.date, `"${(a.vendorName || DEFAULT_CARPENTER_VENDOR).replace(/"/g, '""')}"`, `"${(a.weekLabel || '').replace(/"/g, '""')}"`, a.paidBy, a.mode, a.amount, `"${(a.notes || '').replace(/"/g, '""')}"`].join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvBody], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `HomeLedger_Interiors_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('Excel / CSV spreadsheet downloaded!');
+  };
+
+  // --- Full-Screen Google Sign-In Gate (Strict Single-Owner Access) ---
+  const showLoginGate = !authLoading && !user && (hasFirebaseConfig || !demoBypass);
+
+  if (showLoginGate) {
+    return (
+      <div className={darkMode ? 'dark' : ''}>
+        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200">
+          <div className="w-full max-w-md min-h-screen bg-white dark:bg-slate-900 shadow-2xl sm:border-x border-slate-200/80 dark:border-slate-800 flex flex-col justify-between p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
+                  <HomeIcon className="w-5 h-5" />
+                </div>
+                <span className="text-base font-black tracking-tight">HomeLedger</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDarkMode(!darkMode)}
+                aria-label="Toggle color theme"
+                className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-95 transition-transform touch-manipulation"
+              >
+                {darkMode ? <SunIcon className="w-4 h-4 text-amber-400" /> : <MoonIcon className="w-4 h-4" />}
+              </button>
+            </div>
+
+            <div className="my-auto py-8 space-y-6 text-center">
+              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30">
+                <HomeIcon className="w-10 h-10" />
+              </div>
+
+              <div className="space-y-2">
+                <span className="inline-block px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[11px] font-extrabold uppercase tracking-wider">
+                  Owner-Locked Vault
+                </span>
+                <h1 className="text-2xl font-black tracking-tight">
+                  Interior &amp; Majuri Ledger
+                </h1>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+                  Sign in with your authorized Google account to access your private home interior bills &amp; carpentry khata.
+                </p>
+              </div>
+
+              {authError && (
+                <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs font-extrabold text-rose-600 dark:text-rose-400 text-left">
+                  {authError}
+                </div>
+              )}
+
+              <div className="space-y-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="w-full h-14 px-5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-95 active:scale-[0.98] font-extrabold text-sm flex items-center justify-center gap-3 shadow-xl transition-all touch-manipulation"
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
+                    />
+                  </svg>
+                  <span>Continue with Google</span>
+                </button>
+
+                {!hasFirebaseConfig && (
+                  <button
+                    type="button"
+                    onClick={() => setDemoBypass(true)}
+                    className="w-full h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-extrabold touch-manipulation"
+                  >
+                    Open Local Preview (No Firebase Config)
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="text-center text-[11px] font-semibold text-slate-400">
+              Restricted to <span className="font-bold text-slate-600 dark:text-slate-300">{ALLOWED_EMAIL}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={darkMode ? 'dark' : ''}>
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
+        <div className="w-full max-w-md min-h-screen bg-slate-50 dark:bg-slate-900 shadow-2xl sm:border-x border-slate-200/80 dark:border-slate-800 flex flex-col relative pb-28">
+          {/* Toast Notification Pill */}
+          {toastMessage && (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-full shadow-xl text-xs font-extrabold flex items-center gap-2">
+              <CheckCircleIcon className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
+
+          {/* ================= CLEAN MOBILE HEADER ================= */}
+          <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/70 dark:border-slate-800 px-4 pt-3.5 pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 shrink-0">
+                  <HomeIcon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-base font-black tracking-tight leading-none truncate">HomeLedger</h1>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {!isOnline || syncStatus === 'offline' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                        <CloudOffIcon className="w-3 h-3" /> Offline
+                      </span>
+                    ) : syncStatus === 'synced' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <CloudIcon className="w-3 h-3" /> Synced
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> Interior Vault
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Controls: Report, A+ Font Toggle, Dark Theme, Sign Out */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="h-10 px-3 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 flex items-center gap-1.5 text-xs font-extrabold active:scale-95 transition-all touch-manipulation"
+                >
+                  <PrinterIcon className="w-3.5 h-3.5" />
+                  <span>Report</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLargeTextMode(!largeTextMode)}
+                  title="Toggle Large Text (A+)"
+                  aria-label="Toggle large text"
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black active:scale-95 transition-all touch-manipulation ${
+                    largeTextMode
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
+                  }`}
+                >
+                  A+
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDarkMode(!darkMode)}
+                  aria-label="Toggle color theme"
+                  className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-95 transition-transform touch-manipulation"
+                >
+                  {darkMode ? <SunIcon className="w-4 h-4 text-amber-400" /> : <MoonIcon className="w-4 h-4" />}
+                </button>
+
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    title={`Signed in as ${user.email || ALLOWED_EMAIL}`}
+                    className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center active:scale-95 transition-transform touch-manipulation"
+                  >
+                    <LogOutIcon className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    title={`Sign in with ${ALLOWED_EMAIL}`}
+                    className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center active:scale-95 transition-transform touch-manipulation"
+                  >
+                    <LogInIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* ================= MAIN SCROLLABLE CONTENT AREA ================= */}
+          <main className="flex-1 px-4 pt-4 space-y-4">
+            {/* TAB 1: GRAPHICAL OVERVIEW */}
+            {activeTab === 'overview' && (
+              <section className="space-y-4">
+                {showInstallTip && (
+                  <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold text-indigo-800 dark:text-indigo-200 leading-snug">
+                      Tip: Tap your browser menu → <strong>Add to Home Screen</strong> to use HomeLedger like a phone app.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInstallTip(false);
+                        try {
+                          localStorage.setItem('homeledger_hide_install_tip', 'true');
+                        } catch {
+                          // Ignore
+                        }
+                      }}
+                      className="p-1.5 rounded-xl text-indigo-600 dark:text-indigo-300 shrink-0"
+                    >
+                      <XIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Hero Spend Ring Card */}
+                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                        Total Interior &amp; Appliance Spend
+                      </span>
+                      <h2 className="text-3xl font-black tracking-tight mt-0.5">
+                        {formatINR(analytics.totalSpent)}
+                      </h2>
+                    </div>
+                    <span className="px-3 py-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 text-xs font-extrabold text-slate-600 dark:text-slate-300">
+                      {analytics.billCount} Bills
+                    </span>
+                  </div>
+
+                  {/* Donut Ring + 3 Clear Status Pills */}
+                  <div className="flex items-center gap-4">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <NativeDonutChart data={analytics.categoryDonutData} size={132} strokeWidth={18} />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-[10px] font-bold text-slate-400">Paid</span>
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                          {analytics.totalSpent > 0
+                            ? `${Math.round(((analytics.paidAmount + analytics.advanceAmount) / analytics.totalSpent) * 100)}%`
+                            : '0%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-emerald-500/10">
+                        <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">Paid</span>
+                        <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                          {formatINR(analytics.paidAmount, true)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-500/10">
+                        <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">Advance</span>
+                        <span className="text-sm font-black text-amber-700 dark:text-amber-300">
+                          {formatINR(analytics.advanceAmount, true)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-rose-500/10">
+                        <span className="text-xs font-extrabold text-rose-700 dark:text-rose-300">Pending</span>
+                        <span className="text-sm font-black text-rose-700 dark:text-rose-300">
+                          {formatINR(analytics.totalVendorDues, true)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick-Start Onboarding Card when Empty */}
+                {analytics.billCount === 0 && majuriEntries.length === 0 && (
+                  <div className="p-4 rounded-3xl bg-white dark:bg-slate-800/90 border border-dashed border-indigo-400/60 space-y-3">
+                    <div className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                      Quick Start — Tap a Trade or Log Your First Entry
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openAddExpenseDrawer({ category: 'false_ceiling' })}
+                        className="h-11 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        <span>Add Trade Bill</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('majuri')}
+                        className="h-11 px-3 rounded-2xl bg-orange-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5"
+                      >
+                        <RulerIcon className="w-4 h-4" />
+                        <span>Carpenter Majuri</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Carpenter Majuri Shortcut Card */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('majuri')}
+                  className="w-full text-left bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-3xl p-4 shadow-md shadow-orange-600/20 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-orange-100">
+                      <RulerIcon className="w-3.5 h-3.5" />
+                      <span>Main Carpenter &amp; Vendors Majuri</span>
+                    </div>
+                    <div className="text-base font-black">
+                      {majuriSummary.totalSqft} ft² • Bill {formatINR(majuriSummary.totalWorkBill, true)}
+                    </div>
+                    <div className="text-xs font-bold text-orange-100">
+                      Advances Paid: {formatINR(majuriSummary.totalAdvancePaid, true)}
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                    <ArrowUpRightIcon className="w-5 h-5" />
+                  </div>
+                </button>
+
+                {/* Trade & Shopping Sections Grid (Tap any section to view or add) */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                      Trade &amp; Shopping Sections
+                    </h3>
+                    <span className="text-[11px] font-bold text-slate-400">Tap section</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {analytics.categoryList.map((cat) => {
+                      const CIcon = cat.icon;
+                      return (
+                        <button
+                          type="button"
+                          key={cat.id}
+                          onClick={() => {
+                            setSelectedCategoryFilter(cat.id);
+                            setActiveTab('expenses');
+                          }}
+                          className="text-left bg-white dark:bg-slate-800/90 p-3.5 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm active:scale-[0.98] transition-transform space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className={`w-9 h-9 rounded-2xl ${cat.bg} ${cat.text} flex items-center justify-center`}>
+                              <CIcon className="w-4 h-4" />
+                            </div>
+                            <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
+                              {cat.sharePct}%
+                            </span>
+                          </div>
+                          <div>
+                            <div className="text-xs font-extrabold truncate">{cat.shortLabel}</div>
+                            <div className="text-base font-black mt-0.5">{formatINR(cat.spent, true)}</div>
+                            <div className="text-[10px] font-semibold text-slate-400 truncate mt-0.5">
+                              {cat.subtitle}
+                            </div>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${cat.sharePct}%`, backgroundColor: cat.color }}
+                            />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* TAB 2: BILLS LEDGER (WITH DEDICATED SECTION HEADER & QUICK PRESETS) */}
+            {activeTab === 'expenses' && (
+              <section className="space-y-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-lg font-black">
+                      {selectedFilterCategoryObj ? selectedFilterCategoryObj.label : 'All Interior Bills'} ({filteredExpenses.length})
+                    </h2>
+                    {selectedFilterCategoryObj && (
+                      <p className="text-[11px] font-semibold text-slate-400">
+                        {selectedFilterCategoryObj.subtitle}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="h-9 px-3 rounded-xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1 shrink-0"
+                  >
+                    <SpreadsheetIcon className="w-3.5 h-3.5" />
+                    <span>CSV</span>
+                  </button>
+                </div>
+
+                {/* Section-Specific 1-Tap Quick Add Chips when a Trade Section is Selected */}
+                {selectedFilterCategoryObj && (
+                  <div className="p-3 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700/70 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                        Quick Add in {selectedFilterCategoryObj.shortLabel}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openAddExpenseDrawer({ category: selectedFilterCategoryObj.id })}
+                        className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 underline"
+                      >
+                        + Custom Entry
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedFilterCategoryObj.presets.map((preset) => (
+                        <button
+                          type="button"
+                          key={preset.label}
+                          onClick={() =>
+                            openAddExpenseDrawer({
+                              category: selectedFilterCategoryObj.id,
+                              title: preset.label,
+                              costType: preset.costType
+                            })
+                          }
+                          className="h-8 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[11px] font-extrabold flex items-center gap-1"
+                        >
+                          <PlusIcon className="w-3 h-3" />
+                          <span>{preset.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative">
+                  <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search wire, tank, chimney, store, vendor..."
+                    className="w-full h-11 pl-10 pr-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Horizontal Section Filter Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategoryFilter('all')}
+                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                      selectedCategoryFilter === 'all'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    All Sections
+                  </button>
+                  {INTERIOR_CATEGORIES.map((cat) => (
+                    <button
+                      type="button"
+                      key={cat.id}
+                      onClick={() => setSelectedCategoryFilter(cat.id)}
+                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                        selectedCategoryFilter === cat.id
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {cat.shortLabel}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Type & Status Filter Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  {['all', 'Material', 'Labour', 'Turnkey', 'Lumpsum'].map((ct) => (
+                    <button
+                      type="button"
+                      key={ct}
+                      onClick={() => setCostTypeFilter(ct)}
+                      className={`h-7 px-2.5 rounded-xl text-[11px] font-extrabold shrink-0 ${
+                        costTypeFilter === ct
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      {ct === 'all' ? 'All Types' : ct}
+                    </button>
+                  ))}
+                  {['all', 'Paid', 'Advance', 'Pending'].map((st) => (
+                    <button
+                      type="button"
+                      key={st}
+                      onClick={() => setStatusFilter(st)}
+                      className={`h-7 px-2.5 rounded-xl text-[11px] font-extrabold shrink-0 ${
+                        statusFilter === st
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      {st === 'all' ? 'Any Status' : st}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2.5">
+                  {filteredExpenses.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 text-center space-y-3">
+                      <p className="text-xs font-bold text-slate-400">
+                        No bills recorded in this section yet.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openAddExpenseDrawer(
+                            selectedFilterCategoryObj
+                              ? { category: selectedFilterCategoryObj.id }
+                              : {}
+                          )
+                        }
+                        className="h-10 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        <span>
+                          Add {selectedFilterCategoryObj ? selectedFilterCategoryObj.shortLabel : 'First'} Bill
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
+                    filteredExpenses.map((exp) => {
+                      const catObj = findCategoryById(exp.category);
+                      const CIcon = catObj.icon || ReceiptIcon;
+                      const stObj =
+                        PAYMENT_STATUSES.find((s) => s.id === exp.status) || PAYMENT_STATUSES[0];
+                      return (
+                        <div
+                          key={exp.id}
+                          className="bg-white dark:bg-slate-800/90 p-3.5 rounded-3xl border border-slate-200/70 dark:border-slate-700/70 shadow-sm space-y-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2.5">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className={`w-10 h-10 rounded-2xl ${catObj.bg} ${catObj.text} flex items-center justify-center shrink-0`}>
+                                <CIcon className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-extrabold leading-snug">{exp.title}</h4>
+                                <div className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                                  {exp.vendor} • {exp.date}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-black">{formatINR(exp.amount)}</div>
+                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${stObj.badgeBg}`}>
+                                {exp.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60 text-[11px]">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 font-bold">
+                                {exp.mode}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-bold">
+                                {exp.costType || 'Material'}
+                              </span>
+                              {exp.paymentPlan === 'EMI' && (
+                                <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-extrabold">
+                                  EMI{exp.emiDetails ? ` • ${exp.emiDetails}` : ''}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {exp.receipt && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReceiptPreviewUrl(exp.receipt || null)}
+                                  className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600"
+                                  title="View Photo"
+                                >
+                                  <ImageIcon className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => openAddExpenseDrawer(exp, true)}
+                                className="p-2 rounded-xl bg-amber-500/10 text-amber-600"
+                                title="Repeat / Duplicate Bill"
+                              >
+                                <CopyIcon className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openAddExpenseDrawer(exp)}
+                                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                title="Edit"
+                              >
+                                <EditIcon className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteExpense(exp.id)}
+                                className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
+                                title="Delete"
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* TAB 3: CARPENTRY MAJURI KHATA (MAIN CARPENTER DEFAULT + CUSTOM VENDORS) */}
+            {activeTab === 'majuri' && (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                      Main Carpenter &amp; Vendors Khata
+                    </span>
+                    <h2 className="text-lg font-black">Carpenter Majuri</h2>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handlePrintGraphicalPDF}
+                      className="h-10 px-3 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm"
+                    >
+                      <PrinterIcon className="w-3.5 h-3.5" />
+                      <span>PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const scopeName =
+                          selectedMajuriVendorFilter === 'all'
+                            ? 'All Carpenters'
+                            : selectedMajuriVendorFilter;
+                        const roomLines = majuriSummary.rooms
+                          .filter((r) => r.amount > 0)
+                          .map((r) => `• ${r.label}: ${r.sqft} ft² = ${formatINR(r.amount)}`)
+                          .join('\n');
+                        const balanceLine =
+                          majuriSummary.netBalance >= 0
+                            ? `Net Payable: *${formatINR(majuriSummary.netBalance)}*`
+                            : `Extra Advance Credit: *${formatINR(Math.abs(majuriSummary.netBalance))}*`;
+                        handleShareWhatsApp(
+                          `*HomeLedger Carpenter Majuri (${scopeName})*\nTotal Measured Work: ${majuriSummary.totalSqft} ft² = *${formatINR(majuriSummary.totalWorkBill)}*\nAdvances Paid (No Meas.): *${formatINR(majuriSummary.totalAdvancePaid)}*\n${balanceLine}${roomLines ? `\n\n*Room Summary:*\n${roomLines}` : ''}`
+                        );
+                      }}
+                      className="h-10 px-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm"
+                    >
+                      <ArrowUpRightIcon className="w-3.5 h-3.5" />
+                      <span>Share</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vendor / Carpenter Filter Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMajuriVendorFilter('all')}
+                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                      selectedMajuriVendorFilter === 'all'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    All ({majuriVendorOptions.length})
+                  </button>
+                  {majuriVendorOptions.map((vName) => (
+                    <button
+                      type="button"
+                      key={vName}
+                      onClick={() => setSelectedMajuriVendorFilter(vName)}
+                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                        selectedMajuriVendorFilter === vName
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {vName}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Running Khata Summary Card */}
+                <div className="bg-gradient-to-br from-orange-600 to-amber-600 text-white rounded-3xl p-4 shadow-lg shadow-orange-600/20 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-orange-100">
+                        {selectedMajuriVendorFilter === 'all' ? 'Total Work' : selectedMajuriVendorFilter} ({majuriSummary.totalSqft} ft²)
+                      </span>
+                      <div className="text-2xl font-black mt-0.5">
+                        {formatINR(majuriSummary.totalWorkBill)}
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-white/20 text-xs font-extrabold">
+                      {majuriSummary.settledPct}% Paid
+                    </span>
+                  </div>
+
+                  <div className="w-full h-2.5 rounded-full bg-black/20 overflow-hidden">
+                    <div
+                      className="h-full bg-white rounded-full transition-all duration-500"
+                      style={{ width: `${majuriSummary.settledPct}%` }}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="p-2.5 rounded-2xl bg-white/15">
+                      <span className="text-[10px] font-bold uppercase text-orange-100 block">
+                        Advances Paid (No Meas.)
+                      </span>
+                      <span className="text-sm font-black">
+                        {formatINR(majuriSummary.totalAdvancePaid)}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-2xl bg-white/15">
+                      <span className="text-[10px] font-bold uppercase text-orange-100 block">
+                        {majuriSummary.netBalance >= 0 ? 'Balance Payable' : 'Extra Advance'}
+                      </span>
+                      <span className="text-sm font-black">
+                        {formatINR(Math.abs(majuriSummary.netBalance))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vendor-Wise Khata Breakdown when viewing All */}
+                {selectedMajuriVendorFilter === 'all' && majuriSummary.vendorBreakdown.length > 1 && (
+                  <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-3.5 border border-slate-200/70 dark:border-slate-700/70 space-y-2">
+                    <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                      Carpenter &amp; Vendor Summary
+                    </div>
+                    {majuriSummary.vendorBreakdown.map((vb) => (
+                      <button
+                        type="button"
+                        key={vb.vendorName}
+                        onClick={() => setSelectedMajuriVendorFilter(vb.vendorName)}
+                        className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 text-left"
+                      >
+                        <div>
+                          <div className="text-xs font-extrabold">{vb.vendorName}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {vb.sqft} ft² • Work {formatINR(vb.workBill, true)} • Adv {formatINR(vb.advances, true)}
+                          </div>
+                        </div>
+                        <span
+                          className={`text-xs font-black ${
+                            vb.balance >= 0 ? 'text-rose-500' : 'text-amber-500'
+                          }`}
+                        >
+                          {vb.balance >= 0 ? `Due ${formatINR(vb.balance, true)}` : `Adv +${formatINR(Math.abs(vb.balance), true)}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Horizontal Room Filter Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMajuriRoomFilter('all')}
+                    className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                      selectedMajuriRoomFilter === 'all'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    All Rooms
+                  </button>
+                  {majuriSummary.rooms.map((room) => (
+                    <button
+                      type="button"
+                      key={room.id}
+                      onClick={() =>
+                        setSelectedMajuriRoomFilter(selectedMajuriRoomFilter === room.id ? 'all' : room.id)
+                      }
+                      className={`h-8 px-3 rounded-full text-xs font-extrabold shrink-0 ${
+                        selectedMajuriRoomFilter === room.id
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {room.shortLabel} ({room.sqft} ft²)
+                    </button>
+                  ))}
+                </div>
+
+                {/* Unified Action Toggle: Measure Work vs. Advance Payment (Without Measurement) */}
+                <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3">
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setMajuriActionMode('measure')}
+                      className={`h-10 rounded-xl text-xs font-extrabold transition-all ${
+                        majuriActionMode === 'measure'
+                          ? 'bg-orange-600 text-white shadow-sm'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      + Measure Work
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMajuriActionMode('advance')}
+                      className={`h-10 rounded-xl text-xs font-extrabold transition-all ${
+                        majuriActionMode === 'advance'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      + Advance (No Meas.)
+                    </button>
+                  </div>
+
+                  {majuriActionMode === 'measure' ? (
+                    <form onSubmit={handleSaveMajuriEntry} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400">
+                          Main Carpenter or select vendor
+                        </span>
+                        <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-0.5 text-[11px] font-extrabold">
+                          {['ft', 'in'].map((u) => (
+                            <button
+                              key={u}
+                              type="button"
+                              onClick={() => setMjUnit(u)}
+                              className={`px-2.5 py-1 rounded-lg ${
+                                mjUnit === u ? 'bg-orange-600 text-white' : 'text-slate-500'
+                              }`}
+                            >
+                              {u === 'ft' ? 'Feet' : 'Inches'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Carpenter / Vendor Selector */}
+                      <select
+                        value={mjVendorSelect}
+                        onChange={(e) => setMjVendorSelect(e.target.value)}
+                        className="w-full h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                      >
+                        {majuriVendorOptions.map((vName) => (
+                          <option key={vName} value={vName}>
+                            {vName}
+                          </option>
+                        ))}
+                        <option value="__custom__">+ Add New Vendor / Sub-Contractor...</option>
+                      </select>
+
+                      {mjVendorSelect === '__custom__' && (
+                        <input
+                          type="text"
+                          required
+                          value={mjCustomVendor}
+                          onChange={(e) => setMjCustomVendor(e.target.value)}
+                          placeholder="Enter vendor / sub-contractor name..."
+                          className="w-full h-11 px-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-xs font-extrabold"
+                        />
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={mjRoomId}
+                          onChange={(e) => setMjRoomId(e.target.value)}
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        >
+                          {MAJURI_ROOMS.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={mjItem}
+                          onChange={(e) => setMjItem(e.target.value)}
+                          placeholder="Item (e.g. Wardrobe)"
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                      </div>
+
+                      {/* Quantity Multiplier Stepper (×1, ×2, ×3) */}
+                      <div className="flex items-center justify-between px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                        <span className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
+                          Quantity (Identical Units)
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setMjQty((q) => Math.max(1, q - 1))}
+                            className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 text-sm font-black"
+                          >
+                            −
+                          </button>
+                          <span className="w-8 text-center text-xs font-black">×{mjQty}</span>
+                          <button
+                            type="button"
+                            onClick={() => setMjQty((q) => q + 1)}
+                            className="w-8 h-8 rounded-xl bg-orange-600 text-white text-sm font-black"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          value={mjHeight}
+                          onChange={(e) => setMjHeight(e.target.value)}
+                          placeholder={`H (${mjUnit})`}
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        />
+                        <input
+                          type="number"
+                          step="any"
+                          value={mjWidth}
+                          onChange={(e) => setMjWidth(e.target.value)}
+                          placeholder={`W (${mjUnit})`}
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        />
+                        <input
+                          type="number"
+                          step="any"
+                          value={mjRate}
+                          onChange={(e) => setMjRate(e.target.value)}
+                          placeholder="₹/ft²"
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        />
+                      </div>
+
+                      {/* Smart Rate Presets (₹300, ₹200, ₹150) */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-400 shrink-0">Rate:</span>
+                        {RATE_PRESETS.map((rateVal) => (
+                          <button
+                            key={rateVal}
+                            type="button"
+                            onClick={() => setMjRate(String(rateVal))}
+                            className={`flex-1 h-8 rounded-xl text-xs font-extrabold transition-colors ${
+                              Number(mjRate) === rateVal
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                            }`}
+                          >
+                            ₹{rateVal}/ft²
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-500/10">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400 block">
+                            {liveMajuriCalc.qty > 1 ? `${liveMajuriCalc.qty} pcs • ` : ''}
+                            {liveMajuriCalc.sqft} ft² × ₹{mjRate || 0}
+                          </span>
+                          <span className="text-base font-black text-orange-700 dark:text-orange-300">
+                            {formatINR(liveMajuriCalc.amount)}
+                          </span>
+                        </div>
+                        <button
+                          type="submit"
+                          className="h-11 px-5 rounded-2xl bg-orange-600 text-white text-xs font-extrabold"
+                        >
+                          Save Item
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleSaveCarpenterAdvance} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400">
+                          Advance payment without measurement
+                        </span>
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={advSyncToBills}
+                            onChange={(e) => setAdvSyncToBills(e.target.checked)}
+                            className="rounded text-emerald-600"
+                          />
+                          <span>Sync to Bills</span>
+                        </label>
+                      </div>
+
+                      {/* Carpenter / Vendor Selector for Advance Payment */}
+                      <select
+                        value={advVendorSelect}
+                        onChange={(e) => setAdvVendorSelect(e.target.value)}
+                        className="w-full h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                      >
+                        {majuriVendorOptions.map((vName) => (
+                          <option key={vName} value={vName}>
+                            {vName}
+                          </option>
+                        ))}
+                        <option value="__custom__">+ Add New Vendor / Sub-Contractor...</option>
+                      </select>
+
+                      {advVendorSelect === '__custom__' && (
+                        <input
+                          type="text"
+                          required
+                          value={advCustomVendor}
+                          onChange={(e) => setAdvCustomVendor(e.target.value)}
+                          placeholder="Enter vendor / sub-contractor name..."
+                          className="w-full h-11 px-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-extrabold"
+                        />
+                      )}
+
+                      <div className="flex gap-1.5">
+                        {[5000, 10000, 20000, 30000].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setAdvAmount(String((Number(advAmount) || 0) + chip))}
+                            className="flex-1 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold"
+                          >
+                            +₹{chip / 1000}k
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          value={advAmount}
+                          onChange={(e) => setAdvAmount(e.target.value)}
+                          placeholder="Advance ₹ Amount"
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-extrabold"
+                        />
+                        <input
+                          type="text"
+                          value={advWeekLabel}
+                          onChange={(e) => setAdvWeekLabel(e.target.value)}
+                          placeholder="Label (e.g. Advance #1)"
+                          className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <select
+                          value={advMode}
+                          onChange={(e) => setAdvMode(e.target.value)}
+                          className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        >
+                          <option value="UPI">UPI</option>
+                          <option value="Cash">Cash</option>
+                          <option value="Bank Transfer">Bank</option>
+                        </select>
+                        <input
+                          type="date"
+                          value={advDate}
+                          onChange={(e) => setAdvDate(e.target.value)}
+                          className="h-11 px-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                        <button
+                          type="submit"
+                          className="h-11 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold"
+                        >
+                          Pay Advance
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Measured Work Items List */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Measured Items ({filteredMajuriEntries.length})
+                  </h3>
+                  {filteredMajuriEntries.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
+                      No measured items yet. Use "+ Measure Work" above.
+                    </div>
+                  ) : (
+                    filteredMajuriEntries.map((m) => {
+                      const room = MAJURI_ROOMS.find((r) => r.id === m.roomId);
+                      const qtyText = (m.qty || 1) > 1 ? `${m.qty} × ` : '';
+                      return (
+                        <div
+                          key={m.id}
+                          className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-extrabold uppercase text-orange-600">
+                                {room?.label}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
+                                {m.vendorName || DEFAULT_CARPENTER_VENDOR}
+                              </span>
+                            </div>
+                            <div className="text-xs font-extrabold truncate mt-0.5">{m.item}</div>
+                            <div className="text-[11px] text-slate-400">
+                              {qtyText}{m.height}{m.unit} × {m.width}{m.unit} = {m.sqft} ft² @ ₹{m.rate}/ft²
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-sm font-black">{formatINR(m.amount)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRepeatMajuriEntry(m)}
+                              title="Repeat Measurement"
+                              className="p-2 rounded-xl bg-amber-500/10 text-amber-600"
+                            >
+                              <CopyIcon className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMajuriEntry(m.id)}
+                              title="Delete"
+                              className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
+                            >
+                              <TrashIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Advance Payments (Without Measurement) History List */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Advances Paid Without Measurement ({filteredCarpenterAdvances.length})
+                  </h3>
+                  {filteredCarpenterAdvances.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 text-center text-xs font-bold text-slate-400">
+                      No advance payments recorded yet.
+                    </div>
+                  ) : (
+                    filteredCarpenterAdvances.map((a) => (
+                      <div
+                        key={a.id}
+                        className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2"
+                      >
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-extrabold">{a.weekLabel}</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                              {a.vendorName || DEFAULT_CARPENTER_VENDOR}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {a.date} • {a.mode} • By {a.paidBy}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-emerald-600">
+                            {formatINR(a.amount)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCarpenterAdvance(a.id)}
+                            className="p-2 rounded-xl bg-rose-500/10 text-rose-500"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* TAB 4: CONTRACTORS & VENDORS */}
+            {activeTab === 'vendors' && (
+              <section className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black">Contractors &amp; Vendors</h2>
+                    <p className="text-xs text-slate-400">
+                      Pending Dues: <strong className="text-rose-500">{formatINR(analytics.totalVendorDues)}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsVendorModalOpen(true)}
+                    className="h-10 px-3.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                {analytics.vendorStats.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 text-center space-y-3">
+                    <p className="text-xs font-bold text-slate-400">
+                      No additional vendors added yet (Main Carpenter is active in Majuri).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsVendorModalOpen(true)}
+                      className="h-10 px-4 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      <span>Add Contractor / Vendor</span>
+                    </button>
+                  </div>
+                ) : (
+                  analytics.vendorStats.map((v) => (
+                    <div
+                      key={v.id}
+                      className="bg-white dark:bg-slate-800/90 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-700/70 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-black">{v.name}</h3>
+                          <p className="text-xs text-slate-400">{v.trade}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleShareWhatsApp(
+                              `*HomeLedger Vendor Ledger — ${v.name}*\nAgreed Quote: ${formatINR(v.quoted)}\nPaid So Far: *${formatINR(v.paidToVendor)}*\nBalance Payable: *${formatINR(v.balanceRemaining)}*`
+                            )
+                          }
+                          className="h-8 px-2.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold flex items-center gap-1"
+                        >
+                          <ArrowUpRightIcon className="w-3.5 h-3.5" />
+                          <span>Share</span>
+                        </button>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-bold mb-1">
+                          <span className="text-emerald-600">Paid: {formatINR(v.paidToVendor)}</span>
+                          <span className="text-rose-500">Due: {formatINR(v.balanceRemaining)}</span>
+                        </div>
+                        <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full"
+                            style={{ width: `${v.progressPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {v.milestones.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {v.milestones.map((ms) => (
+                            <div
+                              key={ms.id}
+                              className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-700/60"
+                            >
+                              <div>
+                                <div className="text-xs font-extrabold">{ms.label}</div>
+                                <div className="text-[10px] font-semibold text-slate-400">
+                                  {formatINR(ms.amount)} • Due {ms.dueDate}
+                                </div>
+                              </div>
+                              {ms.status === 'Paid' ? (
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 text-[10px] font-extrabold">
+                                  Paid ✓
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkMilestonePaid(v, ms)}
+                                  className="h-8 px-3 rounded-xl bg-indigo-600 text-white text-[11px] font-extrabold"
+                                >
+                                  Pay Now
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </section>
+            )}
+          </main>
+
+          {/* ================= STREAMLINED 5-ITEM BOTTOM NAVIGATION BAR WITH CENTER (+) ================= */}
+          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800 px-2 py-2 grid grid-cols-5 items-center gap-1">
+            {[
+              { id: 'overview', label: 'Home', icon: LayoutGridIcon },
+              { id: 'expenses', label: 'Bills', icon: ReceiptIcon },
+              { id: '__add__', label: 'Add', icon: PlusIcon },
+              { id: 'majuri', label: 'Majuri', icon: RulerIcon },
+              { id: 'vendors', label: 'Vendors', icon: HardHatIcon }
+            ].map((tab) => {
+              if (tab.id === '__add__') {
+                return (
+                  <div key="add-center" className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => openAddExpenseDrawer()}
+                      aria-label="Add Expense"
+                      className="w-13 h-13 -mt-5 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/35 flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                      <PlusIcon className="w-6 h-6" />
+                    </button>
+                  </div>
+                );
+              }
+              const TIcon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-colors ${
+                    active
+                      ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <TIcon className="w-5 h-5" />
+                  <span className="text-[10px] font-extrabold mt-0.5">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* ================= SIMPLIFIED 3-TAP QUICK ADD BILL DRAWER ================= */}
+          {isAddDrawerOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <form
+                onSubmit={handleSaveExpense}
+                className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-black">
+                    {editingExpenseId ? 'Edit Bill' : 'Add Interior / Appliance Bill'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddDrawerOpen(false)}
+                    className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Big Clear Amount Input + Quick Chips */}
+                <div className="space-y-2">
+                  <div className="relative">
+                    <span className="text-2xl font-black text-indigo-600 absolute left-4 top-1/2 -translate-y-1/2">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      required
+                      value={formAmount}
+                      onChange={(e) => setFormAmount(e.target.value)}
+                      placeholder="0"
+                      className="w-full h-14 pl-10 pr-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-2xl font-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[500, 2000, 10000, 25000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => handleQuickAddAmount(amt)}
+                        className="h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-xs font-extrabold"
+                      >
+                        +₹{amt >= 1000 ? `${amt / 1000}k` : amt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Trade & Shopping Section Grid */}
+                <div className="grid grid-cols-3 gap-2">
+                  {INTERIOR_CATEGORIES.map((cat) => {
+                    const CIcon = cat.icon;
+                    const selected = formCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => handleSelectDrawerCategory(cat.id)}
+                        className={`p-2.5 rounded-2xl border flex flex-col items-center gap-1 text-center ${
+                          selected
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <CIcon className="w-4 h-4" />
+                        <span className="text-[11px] font-extrabold truncate w-full">
+                          {cat.shortLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Smart 1-Tap Item Presets for Selected Trade / Shopping Section */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Quick Items ({activeCategoryObj.shortLabel})
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeCategoryObj.presets.map((preset) => {
+                      const isActivePreset = formTitle === preset.label;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            setFormTitle(preset.label);
+                            setFormCostType(preset.costType);
+                          }}
+                          className={`h-8 px-2.5 rounded-xl text-[11px] font-extrabold transition-colors ${
+                            isActivePreset
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Editable Item Description Input */}
+                <input
+                  type="text"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder={
+                    formCategory === 'appliances'
+                      ? 'Appliance name (Fan, Stove, Chimney, or custom...)'
+                      : 'Item description (editable)...'
+                  }
+                  className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                />
+
+                {/* Appliances Shopping: Store / Source & Full Payment vs. EMI Selector */}
+                {formCategory === 'appliances' && (
+                  <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 space-y-2.5">
+                    <div className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+                      Appliance Purchase Source &amp; Payment Plan
+                    </div>
+                    <input
+                      type="text"
+                      value={formVendor}
+                      onChange={(e) => setFormVendor(e.target.value)}
+                      placeholder="Where did you purchase? (e.g. Croma, Amazon, Local Store)"
+                      className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {PURCHASE_SOURCE_SUGGESTIONS.map((store) => (
+                        <button
+                          key={store}
+                          type="button"
+                          onClick={() => setFormVendor(store)}
+                          className={`h-7 px-2.5 rounded-lg text-[10px] font-extrabold ${
+                            formVendor === store
+                              ? 'bg-cyan-600 text-white'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {store}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      {PAYMENT_PLANS.map((plan) => (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => {
+                            setFormPaymentPlan(plan.id);
+                            if (plan.id === 'EMI') {
+                              setFormMode('Credit Card');
+                            }
+                          }}
+                          className={`h-10 rounded-xl text-xs font-extrabold transition-colors ${
+                            formPaymentPlan === plan.id
+                              ? 'bg-cyan-600 text-white shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {plan.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {formPaymentPlan === 'EMI' && (
+                      <input
+                        type="text"
+                        value={formEmiDetails}
+                        onChange={(e) => setFormEmiDetails(e.target.value)}
+                        placeholder="EMI details (e.g. 6 Months No-Cost EMI • ₹4,500/mo)"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-cyan-500/40 text-xs font-bold"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Duplicate Bill Guard Alert */}
+                {duplicateBillWarning && (
+                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-800 dark:text-amber-200">
+                    Heads up: A bill of <strong>{formatINR(duplicateBillWarning.amount)}</strong> for{' '}
+                    <strong>{duplicateBillWarning.vendor}</strong> on {duplicateBillWarning.date} is already logged.
+                  </div>
+                )}
+
+                {/* Status & Payment Mode Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={formMode}
+                    onChange={(e) => setFormMode(e.target.value)}
+                    className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  >
+                    {PAYMENT_MODES.map((pm) => (
+                      <option key={pm.id} value={pm.id}>
+                        {pm.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value)}
+                    className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  >
+                    {PAYMENT_STATUSES.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Collapsible Optional Details Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowMoreBillFields(!showMoreBillFields)}
+                  className="w-full h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-extrabold text-slate-600 dark:text-slate-300"
+                >
+                  {showMoreBillFields ? '− Hide Extra Details' : '+ Vendor, Type, Date & Bill Photo'}
+                </button>
+
+                {showMoreBillFields && (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {COST_TYPES.map((ct) => (
+                        <button
+                          key={ct.id}
+                          type="button"
+                          onClick={() => setFormCostType(ct.id)}
+                          className={`h-9 rounded-xl text-xs font-extrabold border ${
+                            formCostType === ct.id
+                              ? 'bg-orange-600 text-white border-orange-600'
+                              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {ct.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {formCategory !== 'appliances' && (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={formVendor}
+                          onChange={(e) => setFormVendor(e.target.value)}
+                          placeholder="Vendor / Shop name"
+                          className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                        />
+                        {savedBillVendorSuggestions.length > 0 && (
+                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                            {savedBillVendorSuggestions.map((vName) => (
+                              <button
+                                key={vName}
+                                type="button"
+                                onClick={() => setFormVendor(vName)}
+                                className={`h-7 px-2.5 rounded-full text-[11px] font-extrabold shrink-0 ${
+                                  formVendor === vName
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                }`}
+                              >
+                                {vName}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={formPaidBy}
+                        onChange={(e) => setFormPaidBy(e.target.value)}
+                        className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                      >
+                        {FAMILY_MEMBERS.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            By {m.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        className="h-11 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                      />
+                    </div>
+
+                    <label className="flex items-center justify-center gap-2 h-11 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-extrabold text-slate-500 cursor-pointer">
+                      <CameraIcon className="w-4 h-4 text-indigo-600" />
+                      <span>{formReceipt ? 'Bill Photo Attached ✓' : 'Attach Bill Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReceiptUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full h-13 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-600/25"
+                >
+                  {editingExpenseId ? 'Update Bill' : 'Save Bill'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ================= ADD VENDOR MODAL ================= */}
+          {isVendorModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <form
+                onSubmit={handleAddVendor}
+                className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-3.5"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-black">Add Contractor / Vendor</h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsVendorModalOpen(false)}
+                    className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={newVendorName}
+                  onChange={(e) => setNewVendorName(e.target.value)}
+                  placeholder="Vendor / Contractor Name"
+                  className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                />
+                <input
+                  type="text"
+                  value={newVendorTrade}
+                  onChange={(e) => setNewVendorTrade(e.target.value)}
+                  placeholder="Work Scope (e.g. False Ceiling, Electrician)"
+                  className="w-full h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={newVendorQuoted}
+                    onChange={(e) => setNewVendorQuoted(e.target.value)}
+                    placeholder="Agreed Quote (₹)"
+                    className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  />
+                  <input
+                    type="text"
+                    value={newVendorPhone}
+                    onChange={(e) => setNewVendorPhone(e.target.value)}
+                    placeholder="Phone Number"
+                    className="h-11 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full h-12 rounded-2xl bg-indigo-600 text-white font-black text-xs"
+                >
+                  Save Vendor
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ================= RECEIPT PHOTO PREVIEW MODAL ================= */}
+          {receiptPreviewUrl && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 flex items-center justify-center p-4">
+              <div className="max-w-sm w-full bg-white dark:bg-slate-900 rounded-3xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold">Attached Bill Photo</span>
+                  <button
+                    type="button"
+                    onClick={() => setReceiptPreviewUrl(null)}
+                    className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+                <img
+                  src={receiptPreviewUrl}
+                  alt="Receipt"
+                  className="w-full rounded-2xl max-h-[65vh] object-contain"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ================= GRAPHICAL PDF & CSV EXPORT CENTER MODAL ================= */}
+          {isExportModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      Graphical PDF &amp; Spreadsheet
+                    </span>
+                    <h3 className="text-lg font-black">Export Report</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(false)}
+                    className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 p-4 space-y-3.5">
+                  <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-3.5 flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-100">
+                        HomeLedger Graphical PDF
+                      </div>
+                      <div className="text-base font-black">Interior &amp; Majuri Statement</div>
+                    </div>
+                    <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-white/20">
+                      {analytics.billCount} Bills
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
+                      <span className="text-[10px] font-bold text-indigo-500 block">Spent</span>
+                      <span className="text-xs font-black">{formatINR(analytics.totalSpent, true)}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
+                      <span className="text-[10px] font-bold text-emerald-500 block">Paid / Adv</span>
+                      <span className="text-xs font-black">
+                        {formatINR(analytics.paidAmount + analytics.advanceAmount, true)}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
+                      <span className="text-[10px] font-bold text-rose-500 block">Majuri</span>
+                      <span className="text-xs font-black">{formatINR(majuriSummary.totalWorkBill, true)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handlePrintGraphicalPDF}
+                    className="h-13 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 active:scale-[0.98] transition-all"
+                  >
+                    <PrinterIcon className="w-4 h-4" />
+                    <span>Save PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="h-13 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all"
+                  >
+                    <SpreadsheetIcon className="w-4 h-4" />
+                    <span>Download CSV</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
