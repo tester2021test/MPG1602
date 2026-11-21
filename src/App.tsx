@@ -494,7 +494,16 @@ const compressReceiptImage = (file: File): Promise<string> => {
 
 export default function App() {
   // --- Theme & Navigation State ---
-  const [darkMode, setDarkMode] = useState<boolean>(false);
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('homeledger_theme');
+      if (saved === 'dark') return true;
+      if (saved === 'light') return false;
+      return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
+  });
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [activeProjectKey, setActiveProjectKey] = useState<ProjectKey>('interior');
   const [bypassPreviewLock, setBypassPreviewLock] = useState<boolean>(false);
@@ -577,6 +586,23 @@ export default function App() {
       setToastMessage((prev) => (prev === msg ? null : prev));
     }, 3000);
   };
+
+  // --- Sync Dark Mode Class to Root <html> & LocalStorage (Fixes Mobile & Tailwind v4) ---
+  useEffect(() => {
+    const root = document.documentElement;
+    if (darkMode) {
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+    } else {
+      root.classList.remove('dark');
+      root.style.colorScheme = 'light';
+    }
+    try {
+      localStorage.setItem('homeledger_theme', darkMode ? 'dark' : 'light');
+    } catch {
+      // Ignore storage errors in private browsing
+    }
+  }, [darkMode]);
 
   // --- Online / Offline Network Listener ---
   useEffect(() => {
@@ -1797,9 +1823,10 @@ export default function App() {
                 Private Owner Vault
               </span>
               <button
-                onClick={() => setDarkMode(!darkMode)}
+                type="button"
+                onClick={() => setDarkMode((prev) => !prev)}
                 aria-label="Toggle color theme"
-                className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition-colors"
+                className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 touch-manipulation cursor-pointer transition-colors"
               >
                 {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -1856,15 +1883,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setBypassPreviewLock(true)}
-                  className="w-full h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-extrabold text-slate-600 dark:text-slate-300 transition-colors"
+                  className="w-full h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-extrabold transition-colors"
                 >
-                  Open Local UI Preview (No Firebase Keys Here)
+                  Open Local Preview (No Firebase Keys Detected)
                 </button>
               )}
-            </div>
-
-            <div className="text-center text-[11px] font-semibold text-slate-400">
-              Secured by Google Firebase Authentication
             </div>
           </div>
         </div>
@@ -1874,65 +1897,64 @@ export default function App() {
 
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200 selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-center transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
         <div className="w-full max-w-md min-h-screen bg-slate-50 dark:bg-slate-900 shadow-2xl sm:border-x border-slate-200/80 dark:border-slate-800 flex flex-col relative pb-28">
           {/* Toast Notification Pill */}
           {toastMessage && (
-            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-2xl shadow-2xl text-xs font-extrabold flex items-center justify-center gap-2">
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-full shadow-xl text-sm font-semibold flex items-center gap-2 animate-bounce">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
-              <span className="truncate">{toastMessage}</span>
+              <span>{toastMessage}</span>
             </div>
           )}
 
-          {/* ================= CLEAN MOBILE-FIRST HEADER ================= */}
+          {/* ================= CLEAN MOBILE TOP HEADER ================= */}
           <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800 px-4 pt-3.5 pb-3">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="flex items-center gap-2.5 text-left active:opacity-80"
+              >
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
                   <Home className="w-5 h-5" />
                 </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg font-black tracking-tight leading-none">HomeLedger</h1>
-                  <button
-                    onClick={() => setIsShareModalOpen(true)}
-                    className="flex items-center gap-1.5 mt-1 text-left"
-                  >
+                <div>
+                  <h1 className="text-base font-black tracking-tight leading-none">HomeLedger</h1>
+                  <div className="flex items-center gap-1.5 mt-1">
                     {!isOnline || syncStatus === 'offline' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                        <CloudOff className="w-3 h-3" /> Offline • {sharedRoomCode}
+                        <CloudOff className="w-3 h-3" /> Offline
                       </span>
                     ) : syncStatus === 'synced' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <Cloud className="w-3 h-3" /> Synced • {sharedRoomCode}
-                      </span>
-                    ) : syncStatus === 'syncing' ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                        <Cloud className="w-3 h-3 animate-pulse" /> Syncing...
+                        <Cloud className="w-3 h-3" /> {sharedRoomCode}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" /> {sharedRoomCode}
                       </span>
                     )}
-                  </button>
+                  </div>
                 </div>
-              </div>
+              </button>
 
-              {/* Minimal Right Actions: PDF Report, Theme & Account */}
-              <div className="flex items-center gap-2 shrink-0">
+              {/* Simplified 3-Button Action Cluster */}
+              <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setIsExportModalOpen(true)}
-                  title="Graphical PDF & CSV Export"
-                  className="h-11 px-3.5 rounded-2xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 flex items-center gap-1.5 text-xs font-extrabold active:scale-95 transition-all"
+                  title="Export Graphical PDF & CSV"
+                  className="h-11 px-3.5 rounded-2xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 text-xs font-extrabold active:scale-95 transition-all"
                 >
                   <Download className="w-4 h-4" />
                   <span>Report</span>
                 </button>
 
                 <button
-                  onClick={() => setDarkMode(!darkMode)}
+                  type="button"
+                  onClick={() => setDarkMode((prev) => !prev)}
                   aria-label="Toggle color theme"
-                  className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-95 transition-all"
+                  className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 touch-manipulation cursor-pointer active:scale-95 transition-all"
                 >
                   {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
                 </button>
